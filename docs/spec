@@ -1,0 +1,324 @@
+[settings]
+name = "Symphony"
+
+[fields]
+
+register
+zr 0000
+r1 0001
+r2 0010
+r3 0011
+r4 0100
+r5 0101
+r6 0110
+r7 0111
+r8 1000
+r9 1001
+r10 1010
+r11 1011
+r12 1100
+r13 1101
+sp 1110
+flags 1111
+
+[instructions]
+
+nop
+00000000 00000000 00000000 00000000
+# Ничего не делает.
+
+in %a(register)
+00000001 aaaa0000 00000000 00000000
+# Загружает входное значение и сохраняет его в %a.
+
+out %b(register)
+00000010 00000000 0000bbbb 00000000
+# Отправляет %b на выход.
+
+out %a:U16(immediate)
+00010010 00000000 aaaaaaaa aaaaaaaa
+# Отправляет %a на выход.
+
+keyboard %a(register)
+00000011 aaaa0000 00000000 00000000
+# Загружает ввод с клавиатуры и сохраняет его в %a.
+
+screen %a(register), %b(register)
+00000100 0000aaaa 0000bbbb 00000000
+# Сохраняет значение %b в настройке экрана %a.
+
+screen %a(register), %b:U16(immediate)
+00010100 0000aaaa bbbbbbbb bbbbbbbb
+# Сохраняет значение %b в настройке экрана %a.
+
+time_0 %a(register)
+00000101 aaaa0000 00000000 00000000
+# Загружает младшие четыре байта значения времени и сохраняет его в %a.
+
+time_1 %a(register)
+00000110 aaaa0000 00000000 00000000
+# Загружает старшие четыре байта значения времени и сохраняет его в %a.
+
+counter %a(register)
+00000111 aaaa0000 00000000 00000000
+# Загружает значение счётчика и сохраняет его в %a.
+
+
+
+nand %a(register), %b(register), %c(register)
+00100000 aaaabbbb 0000cccc 00000000
+# И-НЕ(NAND) над %b и %c, результат сохраняет в %a.
+
+or %a(register), %b(register), %c(register)
+00100001 aaaabbbb 0000cccc 00000000
+# ИЛИ(OR) над %b и %c, результат сохраняет в %a.
+
+and %a(register), %b(register), %c(register)
+00100010 aaaabbbb 0000cccc 00000000
+# И(AND) над %b и %c, результат сохраняет в %a.
+
+nor %a(register), %b(register), %c(register)
+00100011 aaaabbbb 0000cccc 00000000
+# ИЛИ-НЕ(NOR) над %b и %c, результат сохраняет в %a.
+
+add %a(register), %b(register), %c(register)
+00100100 aaaabbbb 0000cccc 00000000
+# Складывает %b и %c, результат сохраняет в %a.
+
+sub %a(register), %b(register), %c(register)
+00100101 aaaabbbb 0000cccc 00000000
+# Вычитает %c из %b, результат сохраняет в %a.
+
+xor %a(register), %b(register), %c(register)
+00100110 aaaabbbb 0000cccc 00000000
+# ИСКЛ-ИЛИ(XOR) над %b и %c, результат сохраняет в %a.
+
+lsl %a(register), %b(register), %c(register)
+00100111 aaaabbbb 0000cccc 00000000
+# Логический сдвиг влево %b на %c, результат сохраняет в %a.
+
+lsr %a(register), %b(register), %c(register)
+00101000 aaaabbbb 0000cccc 00000000
+# Логический сдвиг вправо %b на %c, результат сохраняет в %a.
+
+asr %a(register), %b(register), %c(register)
+00101001 aaaabbbb 0000cccc 00000000
+# Арифметический сдвиг вправо %b на %c, результат сохраняет в %a.
+
+cmp %a(register), %b(register)
+00101010 1111aaaa 0000bbbb 00000000
+# Сравнивает %a и %b и сохраняет результат в регистре 'flags'.
+
+
+nand %a(register), %b(register), %c:U16(immediate | label)
+00110000 aaaabbbb cccccccc cccccccc
+# И-НЕ(NAND) над %b и %c, результат сохраняет в %a.
+
+or %a(register), %b(register), %c:U16(immediate | label)
+00110001 aaaabbbb cccccccc cccccccc
+# ИЛИ(OR) над %b и %c, результат сохраняет в %a.
+
+nor %a(register), %b(register), %c:U16(immediate | label)
+00110011 aaaabbbb cccccccc cccccccc
+# ИЛИ-НЕ(NOR) над %b и %c, результат сохраняет в %a.
+
+and %a(register), %b(register), %c:U16(immediate | label)
+00110010 aaaabbbb cccccccc cccccccc
+# И(AND) над %b и %c, результат сохраняет в %a.
+
+add %a(register), %b(register), %c:U16(immediate | label)
+00110100 aaaabbbb cccccccc cccccccc
+# Складывает %b и %c, результат сохраняет в %a.
+
+sub %a(register), %b(register), %c:U16(immediate | label)
+00110101 aaaabbbb cccccccc cccccccc
+# Вычитает %c из %b, результат сохраняет в %a.
+
+xor %a(register), %b(register), %c:U16(immediate | label)
+00110110 aaaabbbb cccccccc cccccccc
+# ИСКЛ-ИЛИ(XOR) над %b и %c, результат сохраняет в %a.
+
+lsl %a(register), %b(register), %c:U16(immediate | label)
+00110111 aaaabbbb cccccccc cccccccc
+# Логический сдвиг влево %b на %c, результат сохраняет в %a.
+
+lsr %a(register), %b(register), %c:U16(immediate | label)
+00111000 aaaabbbb cccccccc cccccccc
+# Логический сдвиг вправо %b на %c, результат сохраняет в %a.
+
+asr %a(register), %b(register), %c:U16(immediate | label)
+00111001 aaaabbbb cccccccc cccccccc
+# Арифметический сдвиг вправо %b на %c, результат сохраняет в %a.
+
+cmp %a(register), %b:U16(immediate)
+00111010 1111aaaa bbbbbbbb bbbbbbbb
+# Сравнивает %a и %b и сохраняет результат в регистре 'flags'.
+
+mul %a(register), %b(register), %c(register)
+00101011 aaaabbbb 0000cccc 00000000
+# Умножает %b и %c, результат сохраняет в %a.
+
+mul %a(register), %b(register), %c:U16(immediate | label)
+00111011 aaaabbbb cccccccc cccccccc
+# Умножает %b и %c, результат сохраняет в %a.
+
+
+jmp %a(register)
+01001000 00001111 0000aaaa 00000000
+# Переход на %a.
+
+
+jmp %a:U16(immediate | label)
+01011000 00001111 aaaaaaaa aaaaaaaa
+# Переход на %a.
+
+je %a:U16(immediate | label)
+01010001 00001111 aaaaaaaa aaaaaaaa
+# Переход на %a если значения были равны (читая результат из 'flags').
+
+jne %a:U16(immediate | label)
+01011001 00001111 aaaaaaaa aaaaaaaa
+# Переход на %a если значения были не равны (читая результат из 'flags').
+
+
+jb %a:U16(immediate | label)
+01010010 00001111 aaaaaaaa aaaaaaaa
+# Переход на %a если первое значение было меньше (беззнаковое) второго (читая результат из 'flags').
+
+jae %a:U16(immediate | label)
+01011010 00001111 aaaaaaaa aaaaaaaa
+# Переход на %a если первое значение было больше (беззнаковое) или равно второму (читая результат из 'flags').
+
+jbe %a:U16(immediate | label)
+01010011 00001111 aaaaaaaa aaaaaaaa
+# Переход на %a если первое значение было меньше (беззнаковое) или равно второму (читая результат из 'flags').
+
+ja %a:U16(immediate | label)
+01011011 00001111 aaaaaaaa aaaaaaaa
+# Переход на %a если первое значение было больше (беззнаковое) второго (читая результат из 'flags').
+
+
+jl %a:U16(immediate | label)
+01010100 00001111 aaaaaaaa aaaaaaaa
+# Переход на %a если первое значение было меньше (знаковое) второго (читая результат из 'flags').
+
+jge %a:U16(immediate | label)
+01011100 00001111 aaaaaaaa aaaaaaaa
+# Переход на %a если первое значение было больше (знаковое) или равно второму (читая результат из 'flags').
+
+jle %a:U16(immediate | label)
+01010101 00001111 aaaaaaaa aaaaaaaa
+# Переход на %a если первое значение было меньше (знаковое) или равно второму (читая результат из 'flags').
+
+jg %a:U16(immediate | label)
+01011101 00001111 aaaaaaaa aaaaaaaa
+# Переход на %a если первое значение было больше (знаковое) второго (читая результат из 'flags').
+
+
+
+load_8 %dest(register), [%adr(register)]
+01100000 dddd0000 0000aaaa 00000000
+# Загружает значение по адресу %adr из основной памяти и сохраняет его в %dest.
+
+load_8 %dest(register), [%adr:U16(immediate)]
+01110000 dddd0000 aaaaaaaa aaaaaaaa
+# Загружает значение по адресу %adr из основной памяти и сохраняет его в %dest.
+
+load_16 %dest(register), [%adr(register)]
+01100001 dddd0000 0000aaaa 00000000
+# Загружает значение по адресу %adr из основной памяти и сохраняет его в %dest.
+
+load_16 %dest(register), [%adr:U16(immediate)]
+01110001 dddd0000 aaaaaaaa aaaaaaaa
+# Загружает значение по адресу %adr из основной памяти и сохраняет его в %dest.
+
+load_32 %dest(register), [%adr(register)]
+01100010 dddd0000 0000aaaa 00000000
+# Загружает значение по адресу %adr из основной памяти и сохраняет его в %dest.
+
+load_32 %dest(register), [%adr:U16(immediate)]
+01110010 dddd0000 aaaaaaaa aaaaaaaa
+# Загружает значение по адресу %adr из основной памяти и сохраняет его в %dest.
+
+pload %dest(register), [%adr(register)]
+01100011 dddd0000 0000aaaa 00000000
+# Загружает значение по адресу %adr из постоянной памяти и сохраняет его в %dest.
+
+pload %dest(register), [%adr:U16(immediate)]
+01110011 dddd0000 aaaaaaaa aaaaaaaa
+# Загружает значение по адресу %adr из постоянной памяти и сохраняет его в %dest.
+
+store_8 [%adr(register)], %value(register)
+01100100 0000vvvv 0000aaaa 00000000
+# Сохраняет %value по адресу %adr в основной памяти.
+
+store_8 [%adr:U16(immediate)], %value(register)
+01110100 0000vvvv aaaaaaaa aaaaaaaa
+# Сохраняет %value по адресу %adr в основной памяти.
+
+store_16 [%adr(register)], %value(register)
+01100101 0000vvvv 0000aaaa 00000000
+# Сохраняет %value по адресу %adr в основной памяти.
+
+store_16 [%adr:U16(immediate)], %value(register)
+01110101 0000vvvv aaaaaaaa aaaaaaaa
+# Сохраняет %value по адресу %adr в основной памяти.
+
+store_32 [%adr(register)], %value(register)
+01100110 0000vvvv 0000aaaa 00000000
+# Сохраняет %value по адресу %adr в основной памяти.
+
+store_32 [%adr:U16(immediate)], %value(register)
+01110110 0000vvvv aaaaaaaa aaaaaaaa
+# Сохраняет %value по адресу %adr в основной памяти.
+
+pstore [%adr(register)], %value(register)
+01100111 0000vvvv 0000aaaa 00000000
+# Сохраняет %value по адресу %adr в постоянной памяти.
+
+pstore [%adr:U16(immediate)], %value(register)
+01110111 0000vvvv aaaaaaaa aaaaaaaa
+# Сохраняет %value по адресу %adr в постоянной памяти.
+
+
+mov %a(register), %b(register)
+00100001 aaaa0000 0000bbbb 00000000
+# Пересылка значения в %a из %b.
+
+mov %a(register), %b:U16(immediate | label)
+00110001 aaaa0000 bbbbbbbb bbbbbbbb
+# Пересылка значения в %a.
+
+neg %a(register), %b(register)
+00100101 aaaa0000 0000bbbb 00000000
+# Вычисляет отрицание %b и сохраняет результат в %a.
+
+neg %a(register), %b:U16(immediate | label)
+00110101 aaaa0000 bbbbbbbb bbbbbbbb
+# Вычисляет отрицание значения и сохраняет результат в %a.
+
+not %a(register), %b(register)
+00100011 aaaa0000 0000bbbb 00000000
+# НЕ(NOT) над %b, результат сохраняет в %a.
+
+not %a(register), %b:U16(immediate | label)
+00110011 aaaa0000 bbbbbbbb bbbbbbbb
+# НЕ(NOT) значения, результат сохраняет в %a.
+
+
+push %a(register)
+00110101 11101110 00000000 00000100   01100110 0000aaaa 00001110 00000000
+# Помещает %a в стек. Эта инструкция — синоним для:   sub sp, sp, 4   store_32 [sp], %a
+
+pop %a(register)
+01100010 aaaa0000 00001110 00000000   00110100 11101110 00000000 00000100
+# Извлекает %a из стека. Эта инструкция — синоним для:   load_32 %a, [sp]   add sp, sp, 4
+
+call %a(label)
+00000111 11110000 00000000 00000000   00110100 11111111 00000000 00010100   00110101 11101110 00000000 00000100   01100110 00001111 00001110 00000000   01011000 00001111 aaaaaaaa aaaaaaaa
+# Вызывает %a. Перезаписывает регистр флагов. Эта инструкция — синоним для:   counter flags   add flags, flags, 20   sub sp, sp, 4   store_32 [sp], flags   jmp %a
+
+ret
+01100010 11110000 00001110 00000000   00110100 11101110 00000000 00000100   01001000 00001111 00001111 00000000
+# Возвращается из последнего вызова функции. Перезаписывает регистр флагов. Эта инструкция — синоним для:   load_32 flags, [sp]   add sp, sp, 4   jmp flags
+

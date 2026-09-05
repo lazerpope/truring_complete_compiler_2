@@ -1,0 +1,1103 @@
+<!doctype html>
+<html lang="en">  
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>LEG Assembler Compiler</title>
+    <style>
+      :root {
+        --bg-0: #23262e;
+        --bg-1: #1a1c22;
+        --bg-2: #2b303b;
+        --panel: #23262e;
+        --panel-2: #2b303b;
+        --text: #d5ced9;
+        --muted: #746f77;
+        --accent: #00e8c6;
+        --accent-2: #f39c12;
+        --border: #363c49;
+        --glow: rgba(0, 232, 198, 0.2);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        height: 100%;
+      }
+
+      body {
+        margin: 0;
+        color: var(--text);
+        font-family: "Cascadia Code", "JetBrains Mono", "Fira Code", "Consolas",
+          "Courier New", monospace;
+        background:
+          radial-gradient(900px 500px at 20% -20%, #2d313b 0%, transparent 60%),
+          radial-gradient(900px 500px at 100% 0%, #20232a 0%, transparent 55%),
+          linear-gradient(180deg, var(--bg-0) 0%, var(--bg-1) 100%);
+        overflow: hidden;
+        
+      }
+
+      .app {
+        height: 100%;
+        display: grid;
+        grid-template-rows: 32px 1fr;
+      }
+
+      .toolbar {
+        height: 32px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 18px 12px;
+        background: linear-gradient(180deg, #23262e, #20232a);
+        border-bottom: 1px solid var(--border);
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+      }
+
+      .toolbar .group {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+
+      .toolbar .spacer {
+        flex: 1;
+      }
+
+      button {
+        height: 24px;
+        padding: 0 10px;
+        border-radius: 6px;
+        border: 1px solid transparent;
+        background: var(--panel-2);
+        color: var(--text);
+        font: inherit;
+        font-size: 12px;
+        letter-spacing: 0.2px;
+        cursor: pointer;
+        transition: transform 120ms ease, border-color 120ms ease,
+          box-shadow 120ms ease, background 120ms ease;
+      }
+
+      button:hover {
+        border-color: var(--accent);
+        box-shadow: 0 0 0 2px var(--glow);
+        transform: translateY(-1px);
+      }
+
+      button:active {
+        transform: translateY(0);
+      }
+
+      .primary {
+        background: linear-gradient(135deg, #00e8c5cc, #07d4b6cc);
+        border-color: #00e8c5cc;
+        color: #20232b;
+      }
+
+      .checkbox {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 12px;
+        color: var(--muted);
+      }
+
+      .checkbox input {
+        accent-color: var(--accent);
+      }
+
+      .panes {
+        height: 100%;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+        padding: 16px;
+        animation: fadeIn 420ms ease-out;
+      }
+
+      .pane {
+        background: linear-gradient(180deg, var(--panel), #1a1c22);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        display: grid;
+        grid-template-rows: auto 1fr;
+        overflow: hidden;
+        box-shadow: 0 12px 30px rgba(0, 0, 0, 0.35);
+      }
+
+      .pane header {
+        padding: 8px 12px;
+        background: linear-gradient(90deg, #23262e, #20232a);
+        border-bottom: 1px solid var(--border);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        color: var(--muted);
+      }
+
+      .pane header span {
+        color: var(--accent);
+      }
+
+      .code-wrap {
+        height:  calc(95vh - 68px);
+        display: grid;
+        grid-template-columns: auto 1fr;
+        overflow: hidden;
+      }
+
+      .code-wrap--single {
+        grid-template-columns: 1fr;
+      }
+
+      .text-gutter {
+        padding: 14px 10px;
+        background: #23262e;
+        border-right: 1px solid var(--border);
+        color: var(--muted);
+        text-align: right;
+        user-select: none;
+      }
+      .text-gutter__inner {
+        white-space: pre;
+        line-height: 1.5;
+        font-size: 12px;
+      }
+
+      textarea {
+        width: 100%;
+        height:  calc(95vh - 68px);
+        resize: none;
+        border: 0;
+        outline: none;
+        padding: 14px;
+        background: transparent;
+        color: var(--text);
+        font: inherit;
+        font-size: 13px;
+        line-height: 1.5;
+      }
+
+      textarea::selection {
+        background: rgba(123, 223, 246, 0.28);
+      }
+
+      .monaco-host {
+        width: 100%;
+        height: calc(95vh - 68px);
+      }
+
+      @keyframes fadeIn {
+        from {
+          opacity: 0;
+          transform: translateY(6px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      @media (max-width: 900px) {
+        .panes {
+          grid-template-columns: 1fr;
+          grid-template-rows: 1fr 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+
+
+
+    <div class="app">
+      <div class="toolbar">
+        <div class="group">
+          <button id="open-editor">Open TXT</button>
+          <button id="download-editor">Download</button>
+          <button id="copy-editor">Copy</button>
+        </div>
+        <div class="spacer"></div>
+        <div class="group">
+          <button id="compile" class="primary">Compile</button>
+          <label class="checkbox">
+            <input id="auto-compile" type="checkbox" />
+            Auto
+          </label>
+        </div>
+        <div class="spacer"></div>
+        <div class="group">
+          <button id="download-result">Download</button>
+          <button id="copy-result">Copy</button>
+        </div>
+      </div>
+      <div class="panes">
+        <section class="pane">
+          <header>
+            Editor
+            <span id="editor-status">Idle</span>
+          </header>
+          <div class="code-wrap code-wrap--single">
+            <div id="editor" class="monaco-host"></div>
+          </div>
+        </section>
+        <section class="pane">
+          <header>
+            Result
+            <span id="result-status">Waiting</span>
+          </header>
+          <div class="code-wrap">
+            <div class="text-gutter">
+              <div id="result-lines" class="text-gutter__inner">1</div>
+            </div>
+            <textarea id="result" spellcheck="false"></textarea>
+          </div>
+        </section>
+      </div>
+    </div>
+
+    <input id="file-input" type="file" accept=".txt" hidden />
+
+    <script src="https://unpkg.com/monaco-editor/min/vs/loader.js"></script>
+
+    <script>
+      const editorEl = document.getElementById("editor");
+      const result = document.getElementById("result");
+      const editorStatus = document.getElementById("editor-status");
+      const resultStatus = document.getElementById("result-status");
+      const resultLines = document.getElementById("result-lines");
+      const fileInput = document.getElementById("file-input");
+      const autoCompile = document.getElementById("auto-compile");
+      const LS_KEY = "leg-compiler-editor";
+      const LS_AUTO_KEY = "leg-compiler-auto";
+      let editor = null;
+
+      const setStatus = (node, text) => {
+        node.textContent = text;
+      };
+
+      const debounce = (fn, delay) => {
+        let timerId = null;
+        return (...args) => {
+          if (timerId) clearTimeout(timerId);
+          timerId = setTimeout(() => fn(...args), delay);
+        };
+      };
+
+      const getEditorValue = () => (editor ? editor.getValue() : "");
+
+      const setEditorValue = (value) => {
+        if (!editor) return;
+        editor.setValue(value);
+      };
+
+      const initEditor = (initialValue) => {
+        if (!window.require) {
+          setStatus(editorStatus, "Editor load failed");
+          return;
+        }
+        window.require.config({
+          paths: { vs: "https://unpkg.com/monaco-editor/min/vs" },
+        });
+        window.require(["vs/editor/editor.main"], () => {
+          monaco.languages.register({ id: "legScript" });
+          monaco.languages.setMonarchTokensProvider("legScript", {
+            keywords: ["let", "if", "else", "true", "false"],
+            operators: ["and", "or", "xor"],
+            ioFuncs: ["readInput", "readKb", "readTimer", "writeOut"],
+            tokenizer: {
+              root: [
+                [/\/\/.*$/, "comment"],
+                [
+                  /\b(?:readInput|readKb|readTimer|writeOut)\b/,
+                  "function",
+                ],
+                [/\b(?:let|if|else|true|false)\b/, "keyword"],
+                [/\b(?:and|or|xor)\b/, "operator"],
+                [/(<<|>>|\/\/|==|=|\+|\-|\*|%)/, "operator"],
+                [/\b[0-9]+\b/, "number"],
+                [/[A-Za-z_]\w*/, "identifier"],
+              ],
+            },
+          });
+          monaco.languages.setLanguageConfiguration("legScript", {
+            comments: {
+              lineComment: "//",
+            },
+          });
+          monaco.languages.registerHoverProvider("legScript", {
+            provideHover: (model, position) => {
+              const word = model.getWordAtPosition(position);
+              if (!word) return null;
+              const functionSigs = new Map([
+                ["readInput", "built-in function readInput()"],
+                ["readKb", "built-in function readKb()"],
+                ["readTimer", "built-in function readTimer()"],
+                ["writeOut", "built-in function writeOut(value)"],
+              ]);
+              const builtinVars = new Set(["io", "kb", "timer", "fstack"]);
+
+              if (functionSigs.has(word.word)) {
+                return {
+                  range: new monaco.Range(
+                    position.lineNumber,
+                    word.startColumn,
+                    position.lineNumber,
+                    word.endColumn
+                  ),
+                  contents: [
+                    {
+                      value: [
+                        "```legScript",
+                        functionSigs.get(word.word),
+                        "```",
+                      ].join("\n"),
+                    },
+                  ],
+                };
+              }
+
+              const text = model.getValue();
+              const declared = new Set();
+              const lines = text.split(/\r?\n/);
+              for (const line of lines) {
+                const match = line.match(/^\s*let\s+([A-Za-z_]\w*)\s*=/);
+                if (match) declared.add(match[1]);
+              }
+              if (declared.has(word.word) || builtinVars.has(word.word)) {
+                return {
+                  range: new monaco.Range(
+                    position.lineNumber,
+                    word.startColumn,
+                    position.lineNumber,
+                    word.endColumn
+                  ),
+                  contents: [
+                    {
+                      value: [
+                        "```legScript",
+                        `let ${word.word}: number`,
+                        "```",
+                      ].join("\n"),
+                    },
+                  ],
+                };
+              }
+
+              return null;
+            },
+          });
+          monaco.editor.defineTheme("leg-dark", {
+            base: "vs-dark",
+            inherit: true,
+            rules: [
+              { token: "comment", foreground: "A0A1A7" },
+              { token: "keyword", foreground: "C74DED" },
+              { token: "operator", foreground: "EE5D43" },
+              { token: "function", foreground: "FFE66D" },
+              { token: "number", foreground: "F39C12" },
+              { token: "identifier", foreground: "00E8C6" },
+            ],
+            colors: {
+              "editor.background": "#23262e",
+              "editor.foreground": "#d5ced9",
+              "editorLineNumber.foreground": "#746f77",
+              "editorLineNumber.activeForeground": "#d5ced9",
+              "editorCursor.foreground": "#ffffff",
+              "editor.selectionBackground": "#3d4352",
+              "editor.selectionHighlightBackground": "#4f4355",
+              "editor.wordHighlightBackground": "#4f4355",
+              "editor.wordHighlightStrongBackground": "#db45a2",
+              "editor.findMatchBackground": "#f39d12",
+              "editor.findMatchHighlightBackground": "#59b8b3",
+              "editor.findMatchBorder": "#f39d12",
+              "editor.hoverHighlightBackground": "#373941",
+              "editor.lineHighlightBackground": "#2e323d",
+              "editor.lineHighlightBorder": "#2e323d",
+              "editorLink.activeForeground": "#3b79c7",
+              "editor.rangeHighlightBackground": "#372f3c",
+              "editorWhitespace.foreground": "#333844",
+              "editorIndentGuide.background": "#333844",
+              "editorIndentGuide.activeBackground": "#585c66",
+              "editorRuler.foreground": "#4f4355",
+              "editorCodeLens.foreground": "#746f77",
+              "editorBracketMatch.background": "#746f77",
+              "editorBracketMatch.border": "#746f77",
+              "editorOverviewRuler.border": "#1b1d23",
+              "editorError.foreground": "#fc644d",
+              "editorWarning.foreground": "#ff9f2e",
+              "editorGutter.background": "#23262e",
+              "editorGutter.modifiedBackground": "#5bc0eb",
+              "editorGutter.addedBackground": "#9bc53d",
+              "editorGutter.deletedBackground": "#fc644d",
+            },
+          });
+          editor = monaco.editor.create(editorEl, {
+            value: initialValue || "",
+            // language: "javascript",
+            language: "legScript",
+            theme: "leg-dark",
+            minimap: { enabled: false },
+            automaticLayout: true,
+          });
+
+          editor.onDidChangeModelContent(() => {
+            setStatus(editorStatus, "Editing");
+            saveEditorToLs();
+            if (autoCompile.checked) compile();
+          });
+
+          if (initialValue) {
+            setStatus(editorStatus, "Restored");
+            if (autoCompile.checked) compile();
+          }
+        });
+      };
+
+      const updateLineNumbers = (textarea, gutter) => {
+        const count = textarea.value === "" ? 1 : textarea.value.split("\n").length;
+        let numbers = "";
+        for (let i = 1; i <= count; i += 1) {
+          numbers += `${i}\n`;
+        }
+        gutter.textContent = numbers.trimEnd();
+      };
+
+      const syncGutterScroll = (textarea, gutter) => {
+        gutter.style.transform = `translateY(-${textarea.scrollTop}px)`;
+      };
+
+      const saveEditorToLs = debounce(() => {
+        localStorage.setItem(LS_KEY, getEditorValue());
+      }, 50);
+
+      const saveAutoToLs = (checked) => {
+        localStorage.setItem(LS_AUTO_KEY, checked ? "1" : "0");
+      };
+
+      const loadEditorFromLs = () => {
+        const saved = localStorage.getItem(LS_KEY);
+        if (saved !== null) {
+          return saved;
+        }
+        return "";
+      };
+
+      const loadAutoFromLs = () => {
+        const saved = localStorage.getItem(LS_AUTO_KEY);
+        if (saved !== null) {
+          autoCompile.checked = saved === "1";
+        }
+      };
+
+      const compile = () => {
+        const raw = preprocess(getEditorValue());
+        const nodes = parseProgram(raw);
+        const state = {
+          symbols: new Map(),
+          nextAddr: 16,
+        };
+        const compiled = formatNodes(nodes, 0, state);
+        result.value = compiled.lines.join("\n");
+        if (compiled.errors.length > 0) {
+          setStatus(resultStatus, `Error: ${compiled.errors[0]}`);
+          return;
+        }
+        setStatus(resultStatus, "Compiled");
+        updateLineNumbers(result, resultLines);
+      };
+
+      const parseProgram = (source) => {
+        const lines = source.replace(/\r\n/g, "\n").split("\n");
+        const { nodes } = parseSection(lines, 0, 0);
+        return nodes;
+      };
+
+      // --------------
+      // PREPROCESSOR
+      // --------------
+      const preprocess = (source) => {
+        const lines = source.replace(/\r\n/g, "\n").split("\n");
+        const processed = lines.map((line) =>
+          line
+            .replace(/\s+true\b/g, "1")
+            .replace(/\s+false\b/g, "0")
+            .replace(/readInput\(\)/g, "io")
+            .replace(/readKb\(\)/g, "kb")
+            .replace(/readTimer\(\)/g, "timer")
+            .replace(/writeOut\(([^)]+)\)/g, "io = $1")
+        );
+        return processed.join("\n");
+      };
+
+      const parseSection = (lines, startIndex, baseIndent) => {
+        const nodes = [];
+        let i = startIndex;
+
+        while (i < lines.length) {
+          const line = lines[i];
+          const indent = getIndent(line);
+          const trimmed = line.trim();
+
+          if (indent < baseIndent) break;
+
+          if (trimmed === "") {
+            nodes.push({ type: "empty", line: i + 1 });
+            i += 1;
+            continue;
+          }
+
+          if (trimmed.startsWith("//")) {
+            nodes.push({ type: "comment", text: '#'+trimmed.slice(2), line: i + 1 });
+            i += 1;
+            continue;
+          }
+
+          if (/\b(if|else)\b/.test(trimmed)) {
+            const blockIndent = indent + 1;
+            const parsed = parseSection(lines, i + 1, blockIndent);
+            nodes.push({
+              type: "block",
+              text: trimmed,
+              line: i + 1,
+              children: parsed.nodes,
+            });
+            i = parsed.nextIndex;
+            continue;
+          }
+
+          nodes.push({ type: "statement", text: trimmed, line: i + 1 });
+          i += 1;
+        }
+
+        return { nodes, nextIndex: i };
+      };
+
+      const getIndent = (line) => line.match(/^\s*/)[0].length;
+
+      const formatNodes = (nodes, depth, state) => {
+        const indent = "  ".repeat(depth);
+        const lines = [];
+        const errors = [];
+
+        for (const node of nodes) {
+          if (node.type === "empty") {
+            lines.push("");
+            continue;
+          }
+
+          if (node.type === "comment") {
+            lines.push(`${indent}${node.text}`);
+            continue;
+          }
+
+          if (node.type === "statement") {
+            const formatted = formatStatement(node.text, indent, state, node.line);
+            lines.push(...formatted.lines);
+            errors.push(...formatted.errors);
+            continue;
+          }
+
+          if (node.type === "block") {
+            lines.push(`${indent}BLOCK ${node.text}`);
+            const nested = formatNodes(node.children, depth + 1, state);
+            lines.push(...nested.lines);
+            errors.push(...nested.errors);
+          }
+        }
+
+        return { lines, errors };
+      };
+
+      const formatStatement = (text, indent, state, lineNo) => {
+        const lines = [];
+        const errors = [];
+        const addError = (message) => {
+          const errorText = `Line ${lineNo}: ${message}`;
+          errors.push(errorText);
+          lines.push(`${indent}ERROR ${message}`);
+        };
+        const SPECIAL_ADDR = new Set(["7", "8", "9", "10"]);
+        const SPECIAL_SYMBOLS = new Set(["io", "kb", "timer", "fstack"]);
+        const isImmediateNumber = (value) =>
+          /^\d+$/.test(value) && !SPECIAL_ADDR.has(value);
+        const isRegister = (value) => /^r[1-6]$/i.test(value);
+        const isKnownSymbol = (name) =>
+          state.symbols.has(name) || isRegister(name) || SPECIAL_SYMBOLS.has(name);
+        const emitMov = (source, target) => {
+          const op = isImmediateNumber(source) ? "i1+mov" : "mov";
+          return `${indent}${op} ${source} _ ${target}`;
+        };
+        const opMap = {
+          "+": "add",
+          "-": "sub",
+          and: "and",
+          or: "or",
+          xor: "xor",
+          "<<": "shl",
+          ">>": "shr",
+          "*": "mul",
+          "/": "div",
+          "%": "mod",
+        };
+        const tokenizeExpression = (text) => {
+          const tokens = [];
+          let i = 0;
+          while (i < text.length) {
+            const ch = text[i];
+            if (/\s/.test(ch)) {
+              i += 1;
+              continue;
+            }
+            if (ch === "(" || ch === ")") {
+              tokens.push({ type: "paren", value: ch });
+              i += 1;
+              continue;
+            }
+            if (ch === "!" || ch === "+" || ch === "-" || ch === "*" || ch === "%") {
+              tokens.push({ type: "op", value: ch });
+              i += 1;
+              continue;
+            }
+            if (ch === "<" || ch === ">") {
+              if (text[i + 1] === ch) {
+                tokens.push({ type: "op", value: ch + ch });
+                i += 2;
+                continue;
+              }
+              throw new Error(`invalid_token ${ch}`);
+            }
+            if (ch === "/") {
+              if (text[i + 1] === "/") {
+                tokens.push({ type: "op", value: "/" });
+                i += 2;
+                continue;
+              }
+              throw new Error("invalid_token /");
+            }
+            if (/[A-Za-z_]/.test(ch)) {
+              let j = i + 1;
+              while (j < text.length && /\w/.test(text[j])) {
+                j += 1;
+              }
+              const word = text.slice(i, j);
+              if (word === "and" || word === "or" || word === "xor") {
+                tokens.push({ type: "op", value: word });
+              } else {
+                tokens.push({ type: "id", value: word });
+              }
+              i = j;
+              continue;
+            }
+            if (/\d/.test(ch)) {
+              let j = i + 1;
+              while (j < text.length && /\d/.test(text[j])) {
+                j += 1;
+              }
+              tokens.push({ type: "number", value: text.slice(i, j) });
+              i = j;
+              continue;
+            }
+            throw new Error(`invalid_token ${ch}`);
+          }
+          return tokens;
+        };
+        const parseExpression = (text) => {
+          const tokens = tokenizeExpression(text);
+          let index = 0;
+
+          const peek = () => tokens[index];
+          const consume = () => tokens[index++];
+          const expect = (type, value) => {
+            const token = consume();
+            if (!token || token.type !== type || token.value !== value) {
+              throw new Error(`expected ${value || type}`);
+            }
+            return token;
+          };
+
+          const parsePrimary = () => {
+            const token = peek();
+            if (!token) throw new Error("unexpected_end");
+            if (token.type === "number") {
+              consume();
+              return { type: "number", value: token.value };
+            }
+            if (token.type === "id") {
+              consume();
+              return { type: "id", name: token.value };
+            }
+            if (token.type === "paren" && token.value === "(") {
+              consume();
+              const expr = parseOr();
+              expect("paren", ")");
+              return expr;
+            }
+            throw new Error(`unexpected_token ${token.value}`);
+          };
+
+          const parseUnary = () => {
+            const token = peek();
+            if (token && token.type === "op" && token.value === "!") {
+              consume();
+              return { type: "unary", op: "!", expr: parseUnary() };
+            }
+            return parsePrimary();
+          };
+
+          const parseMul = () => {
+            let node = parseUnary();
+            while (true) {
+              const token = peek();
+              if (!token || token.type !== "op") break;
+              if (token.value === "*" || token.value === "/" || token.value === "%") {
+                consume();
+                node = { type: "binary", op: token.value, left: node, right: parseUnary() };
+                continue;
+              }
+              break;
+            }
+            return node;
+          };
+
+          const parseAdd = () => {
+            let node = parseMul();
+            while (true) {
+              const token = peek();
+              if (!token || token.type !== "op") break;
+              if (token.value === "+" || token.value === "-") {
+                consume();
+                node = { type: "binary", op: token.value, left: node, right: parseMul() };
+                continue;
+              }
+              break;
+            }
+            return node;
+          };
+
+          const parseShift = () => {
+            let node = parseAdd();
+            while (true) {
+              const token = peek();
+              if (!token || token.type !== "op") break;
+              if (token.value === "<<" || token.value === ">>") {
+                consume();
+                node = { type: "binary", op: token.value, left: node, right: parseAdd() };
+                continue;
+              }
+              break;
+            }
+            return node;
+          };
+
+          const parseAnd = () => {
+            let node = parseShift();
+            while (true) {
+              const token = peek();
+              if (!token || token.type !== "op") break;
+              if (token.value === "and") {
+                consume();
+                node = { type: "binary", op: "and", left: node, right: parseShift() };
+                continue;
+              }
+              break;
+            }
+            return node;
+          };
+
+          const parseXor = () => {
+            let node = parseAnd();
+            while (true) {
+              const token = peek();
+              if (!token || token.type !== "op") break;
+              if (token.value === "xor") {
+                consume();
+                node = { type: "binary", op: "xor", left: node, right: parseAnd() };
+                continue;
+              }
+              break;
+            }
+            return node;
+          };
+
+          const parseOr = () => {
+            let node = parseXor();
+            while (true) {
+              const token = peek();
+              if (!token || token.type !== "op") break;
+              if (token.value === "or") {
+                consume();
+                node = { type: "binary", op: "or", left: node, right: parseXor() };
+                continue;
+              }
+              break;
+            }
+            return node;
+          };
+
+          const ast = parseOr();
+          if (index < tokens.length) {
+            throw new Error(`unexpected_token ${tokens[index].value}`);
+          }
+          return ast;
+        };
+        const compileExpression = (node, regPool) => {
+          const exprLines = [];
+          const exprErrors = [];
+          const allocReg = () => {
+            const reg = regPool.pop();
+            if (!reg) {
+              exprErrors.push("register_overflow");
+              return null;
+            }
+            return reg;
+          };
+          const releaseReg = (reg) => {
+            if (reg) regPool.push(reg);
+          };
+
+          const compileNode = (expr) => {
+            if (expr.type === "number") {
+              const reg = allocReg();
+              if (!reg) return { reg: null };
+              exprLines.push(emitMov(expr.value, reg));
+              return { reg };
+            }
+            if (expr.type === "id") {
+              if (!isKnownSymbol(expr.name)) {
+                exprErrors.push(`undeclared ${expr.name}`);
+                return { reg: null };
+              }
+              const reg = allocReg();
+              if (!reg) return { reg: null };
+              exprLines.push(emitMov(expr.name, reg));
+              return { reg };
+            }
+            if (expr.type === "unary") {
+              const inner = compileNode(expr.expr);
+              if (!inner.reg) return { reg: null };
+              const out = allocReg();
+              if (!out) return { reg: null };
+              exprLines.push(`${indent}not ${inner.reg} ${out}`);
+              releaseReg(inner.reg);
+              return { reg: out };
+            }
+            if (expr.type === "binary") {
+              const left = compileNode(expr.left);
+              const right = compileNode(expr.right);
+              if (!left.reg || !right.reg) return { reg: null };
+              const opMnemonic = opMap[expr.op];
+              if (!opMnemonic) {
+                exprErrors.push(`unknown_op ${expr.op}`);
+                return { reg: null };
+              }
+              const out = allocReg();
+              if (!out) return { reg: null };
+              exprLines.push(`${indent}${opMnemonic} ${left.reg} ${right.reg} ${out}`);
+              releaseReg(left.reg);
+              releaseReg(right.reg);
+              return { reg: out };
+            }
+            exprErrors.push("invalid_expression");
+            return { reg: null };
+          };
+
+          const compiled = compileNode(node);
+          return { lines: exprLines, errors: exprErrors, reg: compiled.reg };
+        };
+
+        const letMatch = text.match(/^let\s+([A-Za-z_]\w*)\s*=\s*(\d+)\s*$/);
+        if (letMatch) {
+          const name = letMatch[1];
+          const value = letMatch[2];
+          if (SPECIAL_SYMBOLS.has(name)) {
+            addError(`invalid_declare ${name}`);
+            return { lines, errors };
+          }
+          let addr = state.symbols.get(name);
+          if (addr === undefined) {
+            addr = state.nextAddr;
+            state.symbols.set(name, addr);
+            state.nextAddr += 1;
+          }
+          lines.push(`${indent}const ${name} ${addr}`, emitMov(value, name));
+          return { lines, errors };
+        }
+
+        const assignLiteralMatch = text.match(
+          /^([A-Za-z_]\w*)\s*=\s*(\d+)\s*$/
+        );
+        if (assignLiteralMatch) {
+          const name = assignLiteralMatch[1];
+          const value = assignLiteralMatch[2];
+          if (SPECIAL_SYMBOLS.has(name) && name !== "io") {
+            addError(`readonly_target ${name}`);
+            return { lines, errors };
+          }
+          if (!isKnownSymbol(name)) {
+            addError(`undeclared ${name}`);
+            return { lines, errors };
+          }
+          lines.push(emitMov(value, name));
+          return { lines, errors };
+        }
+
+        const assignVarMatch = text.match(
+          /^([A-Za-z_]\w*)\s*=\s*([A-Za-z_]\w*)\s*$/
+        );
+        if (assignVarMatch) {
+          const target = assignVarMatch[1];
+          const source = assignVarMatch[2];
+          if (SPECIAL_SYMBOLS.has(target) && target !== "io") {
+            addError(`readonly_target ${target}`);
+            return { lines, errors };
+          }
+          if (!isKnownSymbol(target)) {
+            addError(`undeclared ${target}`);
+            return { lines, errors };
+          }
+          if (!isKnownSymbol(source)) {
+            addError(`undeclared ${source}`);
+            return { lines, errors };
+          }
+          if (target === "io") {
+            lines.push(emitMov(source, target));
+            return { lines, errors };
+          }
+          const reg = "r1";
+          lines.push(emitMov(source, reg), emitMov(reg, target));
+          return { lines, errors };
+        }
+
+        const assignMatch = text.match(/^([A-Za-z_]\w*)\s*=\s*(.+)$/);
+        if (assignMatch) {
+          const target = assignMatch[1];
+          const rhs = assignMatch[2].trim();
+          if (!isKnownSymbol(target)) {
+            addError(`undeclared ${target}`);
+            return { lines, errors };
+          }
+          if (SPECIAL_SYMBOLS.has(target) && target !== "io") {
+            addError(`readonly_target ${target}`);
+            return { lines, errors };
+          }
+          let exprAst;
+          try {
+            exprAst = parseExpression(rhs);
+          } catch (err) {
+            addError(`invalid_expression ${err.message}`);
+            return { lines, errors };
+          }
+          const regPool = ["r6", "r5", "r4", "r3", "r2", "r1"];
+          const compiled = compileExpression(exprAst, regPool);
+          if (compiled.errors.length > 0) {
+            compiled.errors.forEach((message) => addError(message));
+            return { lines, errors };
+          }
+          if (!compiled.reg) {
+            addError("invalid_expression");
+            return { lines, errors };
+          }
+          lines.push(...compiled.lines, emitMov(compiled.reg, target));
+          return { lines, errors };
+        }
+
+        lines.push(`${indent}STATEMENT ${text}`);
+        return { lines, errors };
+      };
+
+
+
+
+      const downloadText = (text, filename) => {
+        const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(blob);
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(link.href);
+      };
+
+      const copyText = async (text) => {
+        await navigator.clipboard.writeText(text);
+      };
+
+      document.getElementById("open-editor").addEventListener("click", () => {
+        fileInput.value = "";
+        fileInput.click();
+      });
+
+      fileInput.addEventListener("change", (event) => {
+        const file = event.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = () => {
+          setEditorValue(reader.result || "");
+          setStatus(editorStatus, "Loaded");
+          if (autoCompile.checked) compile();
+        };
+        reader.readAsText(file);
+      });
+
+      document.getElementById("download-editor").addEventListener("click", () => {
+        downloadText(getEditorValue(), "editor.txt");
+      });
+
+      document.getElementById("copy-editor").addEventListener("click", async () => {
+        await copyText(getEditorValue());
+        setStatus(editorStatus, "Copied");
+      });
+
+      document.getElementById("compile").addEventListener("click", () => {
+        compile();
+      });
+
+      autoCompile.addEventListener("change", () => {
+        saveAutoToLs(autoCompile.checked);
+        if (autoCompile.checked) compile();
+      });
+
+      document.getElementById("download-result").addEventListener("click", () => {
+        downloadText(result.value, "result.txt");
+      });
+
+      document.getElementById("copy-result").addEventListener("click", async () => {
+        await copyText(result.value);
+        setStatus(resultStatus, "Copied");
+      });
+
+      result.addEventListener("input", () => {
+        updateLineNumbers(result, resultLines);
+      });
+
+      result.addEventListener("scroll", () => {
+        syncGutterScroll(result, resultLines);
+      });
+
+      loadAutoFromLs();
+      initEditor(loadEditorFromLs());
+      updateLineNumbers(result, resultLines);
+    </script>
+
+
+
+
+
+<!-- EXTERNAL -->
+
+
+
+
+
+  </body>
+</html>
