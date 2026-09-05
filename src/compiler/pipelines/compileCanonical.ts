@@ -1,4 +1,4 @@
-import { CompilerError } from '../compilerError'
+import { CompilerError, runCompilerTransform, type PrecompilerPipeline } from '../compilerError'
 import type {
   ArrayAccessExpression,
   AssignmentTarget,
@@ -57,9 +57,11 @@ const COMPARISON_JUMPS: Partial<Record<BinaryOperator, string>> = {
 
 const isComparison = (operator: BinaryOperator): boolean => operator in COMPARISON_JUMPS
 
-export function doStep(source: string): string {
-  const program = parseCanonical(source)
-  return new AssemblyCompiler(program).compile()
+export function doStep(pipeline: PrecompilerPipeline): PrecompilerPipeline {
+  return runCompilerTransform(pipeline, (source) => {
+    const program = parseCanonical(source)
+    return new AssemblyCompiler(program).compile()
+  })
 }
 
 class AssemblyCompiler {

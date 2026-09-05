@@ -246,7 +246,8 @@ MathCall               ::= "Math" "." MathBinaryName
                          | "Math" "." "abs" "(" SourceExpression ")"
 MathBinaryName         ::= "min" | "max" | "smin" | "smax"
 MathConstant           ::= "Math" "." MathConstantName
-MathConstantName       ::= "U32_MIN" | "U32_MAX" | "S32_MIN" | "S32_MAX"
+MathConstantName       ::= "U16_MAX" | "S16_MAX"
+                         | "U32_MAX" | "S32_MIN" | "S32_MAX"
 ```
 
 Semantic rules:
@@ -335,8 +336,7 @@ CoreLogicalAnd          ::= CoreBitwiseOr { "&&" CoreBitwiseOr }
 CoreBitwiseOr           ::= CoreBitwiseXor { "|" CoreBitwiseXor }
 CoreBitwiseXor          ::= CoreBitwiseAnd { "^" CoreBitwiseAnd }
 CoreBitwiseAnd          ::= CoreEquality { "&" CoreEquality }
-CoreEquality            ::= CoreRelational
-                            { ( "==" | "!=" | "===" | "!==" ) CoreRelational }
+CoreEquality            ::= CoreRelational { ( "==" | "!=" ) CoreRelational }
 CoreRelational          ::= CoreShift
                             { ( "<" | "<=" | ">" | ">="
                               | "s<" | "s<=" | "s>" | "s>=" ) CoreShift }
@@ -362,6 +362,7 @@ Canonical semantic restrictions:
 - `true`, `false`, `null`, and `undefined` have become `0` or `1`.
 - Array literals have become `Array(size)` plus indexed assignments.
 - `.length`, `Math`, constant `**`, `else if`, both forms of `for`, postfix updates, and compound assignments are absent.
+- Strict equality spellings have been collapsed: `===` is `==`, and `!==` is `!=`.
 - Nested hardware reads and complex hardware-write arguments have become ordered temporary statements.
 - User-authored identifiers never begin with `__ts_`; generated identifiers do.
 - Comments remain attached to the first generated statement for their source statement.

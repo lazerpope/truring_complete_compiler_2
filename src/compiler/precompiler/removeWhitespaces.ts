@@ -1,5 +1,6 @@
-export function doStep(source: string): string {
-  const input = source.replace(/\r\n?/g, '\n')
+import { runCompilerTransform, type PrecompilerPipeline } from '../compilerError'
+
+const removeWhitespaces = (input: string): string => {
   let output = ''
   let mode: 'code' | 'lineComment' | 'blockComment' = 'code'
   let pendingSpace = false
@@ -68,4 +69,8 @@ export function doStep(source: string): string {
   }
 
   return output
+}
+
+export function doStep(pipeline: PrecompilerPipeline): PrecompilerPipeline {
+  return runCompilerTransform(pipeline, removeWhitespaces)
 }

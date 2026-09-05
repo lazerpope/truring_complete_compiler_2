@@ -23,7 +23,7 @@ This document is the source of truth for TuringScript. Sections marked **Confirm
 
 ### Confirmed
 
-The public compiler and every registered step use this result contract:
+The public compiler and every registered precompiler/compiler step use this pipeline contract:
 
 ```ts
 class CompilerError extends Error {
@@ -31,24 +31,49 @@ class CompilerError extends Error {
   errorOccured: boolean
 }
 
-type CompilerResult = string | CompilerError
-type CompilerStep = (source: string) => CompilerResult
+interface PipelineErrorState {
+  isError: boolean
+  reasons: string[]
+}
+
+interface PipelineDebugResult {
+  phase: 'precompiler' | 'pipeline'
+  stepName: string
+  resultingCode: string
+}
+
+interface PipelineDebugState {
+  isEnabled: boolean
+  results: PipelineDebugResult[]
+}
+
+type PrecompilerPipeline = [
+  code: string,
+  error: PipelineErrorState,
+  debug: PipelineDebugState,
+]
+
+type CompilerResult = PrecompilerPipeline
+type CompilerStep = (pipeline: PrecompilerPipeline) => CompilerResult
 ```
 
-- A successful step returns its transformed source string.
-- A failed step returns `CompilerError`.
-- `errorOccured` is `true` for a `CompilerError`.
-- Compilation stops immediately after the first returned or thrown error.
-- The application displays the error's `reason` in the output pane.
+- Every step receives and returns the complete pipeline tuple.
+- Tuple item `0` is the current source or assembly string.
+- Tuple item `1` accumulates error reasons. A failed step returns `isError: true` and one or more `reasons`.
+- Tuple item `2` carries debug configuration and ordered step snapshots.
+- A thrown `CompilerError` or unexpected exception is converted into the tuple's error state.
+- Compilation stops immediately after the first step returning an error state.
+- The application displays all collected error reasons in the output pane.
 - Partial assembly produced before an error is not executable output.
+- When `DEBUG_COLLECT` is `true`, the compiler records the resulting code after every named step and prints all snapshots to the console in registration order using styled console groups.
 
 The two compiler phases always run in this order:
 
 ```text
-source string
+initial PrecompilerPipeline
   -> registered precompilers, in registration order
   -> registered compiler pipelines, in registration order
-  -> Symphony assembly string or CompilerError
+  -> final CompilerResult tuple
 ```
 
 ## 3. Precompiler boundary
@@ -466,14 +491,16 @@ let signedSmaller = Math.smin(a, b) // signed comparison
 let signedLarger = Math.smax(a, b)  // signed comparison
 let magnitude = Math.abs(value)     // signed interpretation
 
-let unsignedMinimum = Math.U32_MIN // 0
-let unsignedMaximum = Math.U32_MAX // 0xffffffff
-let signedMinimum = Math.S32_MIN   // 0x80000000
-let signedMaximum = Math.S32_MAX   // 0x7fffffff
+let maximumU16 = Math.U16_MAX // 0xffff
+let maximumS16 = Math.S16_MAX // 0x7fff
+let maximumU32 = Math.U32_MAX // 0xffffffff
+let minimumS32 = Math.S32_MIN // 0x80000000
+let maximumS32 = Math.S32_MAX // 0x7fffffff
 ```
 
 - `min`, `max`, `smin`, and `smax` require exactly two arguments.
 - `abs` requires exactly one argument.
+- Unsigned minimum constants are omitted because their value is always the literal `0`.
 - Arguments may be runtime expressions. Each argument is evaluated exactly once, from left to right.
 - `Math.abs(Math.S32_MIN)` produces the unchanged bit pattern `0x80000000`; no overflow error or special correction is generated.
 - Any other `Math` property or call is prohibited unless registered by a later precompiler extension.
@@ -660,10 +687,10 @@ The compiler appends no halt instruction or terminal loop. Ending execution safe
 
 ### Confirmed
 
-- Invalid syntax and unsupported features return `CompilerError`.
-- `CompilerError.reason` contains the user-facing explanation.
-- `CompilerError.errorOccured` is `true`.
-- The first compiler error stops the remaining compilation steps.
+- Invalid syntax and unsupported features set `PipelineErrorState.isError` to `true` and append user-facing messages to `reasons`.
+- A stage may collect multiple related reasons before it returns.
+- `CompilerError.reason` is converted into a pipeline reason when a stage throws it.
+- The first stage returning an error stops the remaining compilation steps.
 - The compiler currently does not promise a separate error code, line, or column field.
 
 ## 17. Canonical precompiler output
@@ -689,7 +716,7 @@ The output must use only features understood by the next registered step. The fi
 - Simple statements are emitted one per line without semicolons.
 - Comments remain attached to the first generated line for their source statement.
 
-A precompiler may itself tokenize or parse source internally. Its public boundary remains `string -> string | CompilerError`.
+A precompiler may itself tokenize or parse source internally. Its public boundary remains `PrecompilerPipeline -> CompilerResult`; tuple item `0` is the textual TuringScript passed to the next stage.
 
 ## 18. Remaining decisions before implementation
 
