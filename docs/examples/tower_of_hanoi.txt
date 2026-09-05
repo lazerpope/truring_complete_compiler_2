@@ -1,0 +1,69 @@
+const n = r1
+const src = r2
+const dst = r3
+const spare = r4
+const temp = r5
+
+
+in n
+in src
+in dst
+in spare
+add n,n,1
+call hanoi
+
+end:
+jmp end
+
+
+hanoi:
+cmp n,0
+je hanoiReturn
+
+
+push n
+push src
+push dst
+push spare
+
+
+// hanoi(n - 1, src, spare, dst)
+
+sub n,n,1
+
+mov temp,dst
+mov dst,spare
+mov spare,temp
+
+call hanoi
+
+
+// restore original arguments
+
+pop spare
+pop dst
+pop src
+pop n
+
+
+// move one disk src -> dst
+
+out src
+out 5
+out dst
+out 5
+
+
+// hanoi(n - 1, spare, dst, src)
+
+sub n,n,1
+
+mov temp,src
+mov src,spare
+mov spare,temp
+
+call hanoi
+
+
+hanoiReturn:
+ret

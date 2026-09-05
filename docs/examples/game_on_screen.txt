@@ -1,0 +1,6030 @@
+
+/*  Jump table initialisation
+
+    r1: sprite id
+    r2: pointer address
+    r3: pointer value
+*/
+
+; sprite_empty
+add r1, zr, 0
+lsl r2, r1, 2
+add r2, r2, ptr_textures_addresses
+add r3, zr, sprite_empty
+store_32 [r2], r3
+; sprite_unimplemented
+add r1, zr, 1
+lsl r2, r1, 2
+add r2, r2, ptr_textures_addresses
+add r3, zr, sprite_unimplemented
+store_32 [r2], r3
+
+; sprite_robot_up
+add r1, zr, 2
+lsl r2, r1, 2
+add r2, r2, ptr_textures_addresses
+add r3, zr, sprite_robot_up
+store_32 [r2], r3
+; sprite_robot_right
+add r1, zr, 3
+lsl r2, r1, 2
+add r2, r2, ptr_textures_addresses
+add r3, zr, sprite_robot_right
+store_32 [r2], r3
+; sprite_robot_down
+add r1, zr, 4
+lsl r2, r1, 2
+add r2, r2, ptr_textures_addresses
+add r3, zr, sprite_robot_down
+store_32 [r2], r3
+; sprite_robot_left
+add r1, zr, 5
+lsl r2, r1, 2
+add r2, r2, ptr_textures_addresses
+add r3, zr, sprite_robot_left
+store_32 [r2], r3
+
+; sprite_ghost_up
+add r1, zr, 6
+lsl r2, r1, 2
+add r2, r2, ptr_textures_addresses
+add r3, zr, sprite_ghost_up
+store_32 [r2], r3
+; sprite_ghost_right
+add r1, zr, 7
+lsl r2, r1, 2
+add r2, r2, ptr_textures_addresses
+add r3, zr, sprite_ghost_right
+store_32 [r2], r3
+; sprite_ghost_down
+add r1, zr, 8
+lsl r2, r1, 2
+add r2, r2, ptr_textures_addresses
+add r3, zr, sprite_ghost_down
+store_32 [r2], r3
+; sprite_ghost_left
+add r1, zr, 9
+lsl r2, r1, 2
+add r2, r2, ptr_textures_addresses
+add r3, zr, sprite_ghost_left
+store_32 [r2], r3
+
+; sprite_coin
+add r1, zr, 10
+lsl r2, r1, 2
+add r2, r2, ptr_textures_addresses
+add r3, zr, sprite_coin
+store_32 [r2], r3
+; r1 = screen parameter value
+mov r1, 0
+screen r1, 2
+
+mov r1, 1
+add r2, zr, visual_data
+screen r1, r2
+
+mov r1, 2
+screen r1, 19
+
+const robot_initial_x = 1
+const robot_initial_y = 1
+const robot_initial_direction = 2
+
+mov r1, robot_initial_x
+mov r2, robot_initial_y
+mov r5, robot_initial_direction
+add r6, zr, ptr_state_robot
+store_8 [r6], r1
+add r6, r6, 1
+store_8 [r6], r2
+add r6, r6, 1
+store_8 [r6], r5
+
+mov r3, 4
+call drawing_draw_sprite_at_map_coord
+const ghost_initial_x = 13
+const ghost_initial_y = 1
+const ghost_initial_direction = 2
+
+mov r1, ghost_initial_x
+mov r2, ghost_initial_y
+mov r5, ghost_initial_direction
+add r6, zr, ptr_state_ghost
+store_8 [r6], r1
+add r6, r6, 1
+store_8 [r6], r2
+add r6, r6, 1
+store_8 [r6], r5
+
+mov r3, 8
+call drawing_draw_sprite_at_map_coord
+/*
+    r1, r2: now high, low
+    r3, r4: initial delay high, low
+    r5, r6: next cycle high, low
+    r7: pointer
+*/
+time_0 r2
+time_1 r1
+
+; Робот
+add r7, zr, ptr_timer_robot_next_cycle_high
+load_32 r3, [r7]
+add r7, zr, ptr_timer_robot_next_cycle_low
+load_32 r4, [r7]
+
+call u64_add
+
+add r7, zr, ptr_timer_robot_next_cycle_high
+store_32 [r7], r5
+add r7, zr, ptr_timer_robot_next_cycle_low
+store_32 [r7], r6
+
+; Призрак
+add r7, zr, ptr_timer_ghost_next_cycle_high
+load_32 r3, [r7]
+add r7, zr, ptr_timer_ghost_next_cycle_low
+load_32 r4, [r7]
+
+call u64_add
+
+add r7, zr, ptr_timer_ghost_next_cycle_high
+store_32 [r7], r5
+add r7, zr, ptr_timer_ghost_next_cycle_low
+store_32 [r7], r6
+
+game_loop:
+/*  Event handling
+
+    r1 = keyboard event+key / direction
+    r2 = keyboard key / direction address
+    r3 = keyboard event
+    r4 = jump address
+*/
+keyboard r1
+and r2, r1, 0x00FF
+and r3, r1, 0x0100
+
+cmp r3, 0x0100
+jne handle_event_end
+cmp r2, 1
+jb handle_event_end
+cmp r2, 4
+ja handle_event_end
+
+sub r4, r2, 1 ; так что первое значение равно 0
+lsl r4, r4, 3 ; 2 * длина инструкции = 8
+add r4, r4, handle_event_jump_table_start
+jmp r4
+
+handle_event_jump_table_start:
+; key_up
+mov r1, 0
+jmp handle_event_store_direction
+; key_right
+mov r1, 1
+jmp handle_event_store_direction
+; key_down:
+mov r1, 2
+jmp handle_event_store_direction
+; key_left:
+mov r1, 3
+;jmp handle_event_end
+
+handle_event_store_direction:
+add r2, zr, ptr_state_robot
+add r2, r2, 2
+store_8 [r2], r1
+
+handle_event_end:
+
+    /*
+    For all timers:
+        r1, r2: cycle duration high, low
+        r7, r8: now high, low
+    */
+    add r9, zr, ptr_cycle_duration_high
+    load_32 r1, [r9]
+    add r9, zr, ptr_cycle_duration_low
+    load_32 r2, [r9]
+    time_0 r8
+    time_1 r7
+
+    push r1
+    push r2
+    push r7
+    push r8
+/*  Timer comparison / update
+    r1, r2: cycle duration high, low [IN]
+    r3, r4: next cycle high, low
+    r5, r6: cycle after this one high, low
+    r7, r8: now high, low [IN]
+    r9: pointer
+*/
+add r9, zr, ptr_timer_robot_next_cycle_high
+load_32 r3, [r9]
+add r9, zr, ptr_timer_robot_next_cycle_low
+load_32 r4, [r9]
+
+cmp r7, r3
+jb timer_robot_end
+ja timer_robot_trigger
+cmp r8, r4
+jb timer_robot_end
+
+timer_robot_trigger:
+; обновить следующий такт
+call u64_add
+add r9, zr, ptr_timer_robot_next_cycle_high
+store_32 [r9], r5
+add r9, zr, ptr_timer_robot_next_cycle_low
+store_32 [r9], r6
+
+
+/*  Movement
+    r1, r2: x, y
+    r3: sprite id
+    r4: direction
+    r5, r6: increments x, y
+    r7, r8: [RESERVED]
+    r9: pointer
+    r10: tile content
+    r13: tile address
+*/
+add r9, zr, ptr_state_robot
+load_8 r1, [r9]
+add r9, r9, 1
+load_8 r2, [r9]
+add r9, r9, 1
+load_8 r4, [r9]
+
+call drawing_clear_tile
+
+mov r5, 0
+mov r6, 0
+
+lsl r9, r4, 3 ; 2 * размер инструкции = 8
+add r9, r9, timer_robot_direction_jump_table
+jmp r9
+
+timer_robot_direction_jump_table:
+; direction_up
+sub r6, r6, 1
+jmp timer_robot_try_move
+; direction_right
+add r5, r5, 1
+jmp timer_robot_try_move
+; direction_down
+add r6, r6, 1
+jmp timer_robot_try_move
+; direction_left
+sub r5, r5, 1
+;jmp timer_robot_try_move
+
+/*
+    Collision handling
+*/
+timer_robot_try_move:
+add r1, r1, r5
+add r2, r2, r6
+call game_get_tile_address_from_map_coord
+load_8 r10, [r13]
+cmp r10, 1
+jne timer_robot_move
+; удар о стену -> отменить движение
+sub r1, r1, r5
+sub r2, r2, r6
+jmp timer_robot_draw
+
+timer_robot_move:
+; TODO: обрабатывать монету и пустоту по-разному
+mov r10, 0
+store_8 [r13], r10
+
+add r9, zr, ptr_state_robot
+store_8 [r9], r1
+add r9, r9, 1
+store_8 [r9], r2
+
+timer_robot_draw:
+; нарисовать робота на новой позиции
+add r3, r4, 2
+call drawing_draw_sprite_at_map_coord
+
+timer_robot_end:
+    pop r8
+    pop r7
+    pop r2
+    pop r1
+
+/*  Timer comparison / update
+    r1, r2: cycle duration high, low [IN]
+    r3, r4: next cycle high, low
+    r5, r6: cycle after this one high, low
+    r7, r8: now high, low [IN]
+    r9: pointer
+*/
+add r9, zr, ptr_timer_ghost_next_cycle_high
+load_32 r3, [r9]
+add r9, zr, ptr_timer_ghost_next_cycle_low
+load_32 r4, [r9]
+
+cmp r7, r3
+jb timer_ghost_end
+ja timer_ghost_trigger
+cmp r8, r4
+jb timer_ghost_end
+
+timer_ghost_trigger:
+; обновить следующий такт
+call u64_add
+add r9, zr, ptr_timer_ghost_next_cycle_high
+store_32 [r9], r5
+add r9, zr, ptr_timer_ghost_next_cycle_low
+store_32 [r9], r6
+
+
+/*  Movement
+    r1, r2: x, y
+    r3: sprite id
+    r4: direction
+    r5, r6: increments x, y
+    r7, r8: [RESERVED]
+    r9: pointer
+    r10: tile content
+    r13: tile address
+*/
+add r9, zr, ptr_state_ghost
+load_8 r1, [r9]
+add r9, r9, 1
+load_8 r2, [r9]
+add r9, r9, 1
+load_8 r4, [r9]
+
+call drawing_clear_tile
+
+mov r5, 0
+mov r6, 0
+
+lsl r9, r4, 3 ; 2 * размер инструкции = 8
+add r9, r9, timer_ghost_direction_jump_table
+jmp r9
+
+timer_ghost_direction_jump_table:
+; direction_up
+sub r6, r6, 1
+jmp timer_ghost_move
+; direction_right
+add r5, r5, 1
+jmp timer_ghost_move
+; direction_down
+add r6, r6, 1
+jmp timer_ghost_move
+; direction_left
+sub r5, r5, 1
+;jmp timer_ghost_move
+
+timer_ghost_move:
+add r1, r1, r5
+add r2, r2, r6
+add r9, zr, ptr_state_ghost
+store_8 [r9], r1
+add r9, r9, 1
+store_8 [r9], r2
+
+; нарисовать призрака на новой позиции
+add r3, r4, 6
+call drawing_draw_sprite_at_map_coord
+
+/*
+    Check ahead for direction change
+*/
+add r1, r1, r5
+add r2, r2, r6
+call game_get_tile_address_from_map_coord
+
+load_8 r10, [r13]
+cmp r10, 1
+jne timer_ghost_end
+; увеличить направление
+add r9, zr, ptr_state_ghost
+add r9, r9, 2
+load_8 r4, [r9]
+add r4, r4, 1
+and r4, r4, 0b11 ; modulo 3
+store_8 [r9], r4
+
+timer_ghost_end:
+
+jmp game_loop
+
+/*  Add two unsigned 64 bit
+
+    Input:
+        r1, r2: A.high, A.low
+        r3, r4: B.high, B.low
+
+    Output:
+        r5, r6: C.high, C.low
+*/
+u64_add:
+    add r5, r1, r3
+    add r6, r2, r4
+    cmp r6, r2
+    jae u64_add_no_low_overflow
+    add r5, r5, 1 ; переполнение
+
+    u64_add_no_low_overflow:
+    ret
+/* Return the tile address from the given map coordinate
+
+    Inputs:
+        r1: x map coordinate
+        r2: y map coordinate
+
+    Outputs:
+        r13: tile address
+*/
+game_get_tile_address_from_map_coord:
+    push r1
+    push r2
+
+    add r13, r1, map
+    get_tile_address_from_map_coord_loop:
+        cmp r2, 0
+        je get_tile_address_from_map_coord_loop_end
+        add r13, r13, 15
+        sub r2, r2, 1
+        jmp get_tile_address_from_map_coord_loop
+        get_tile_address_from_map_coord_loop_end:
+
+    pop r2
+    pop r1
+    ret
+/*  Draw the tile corresponding to the given coordinate with it's map content
+
+    Inputs:
+        r1, r2: Map coordinates x, y
+
+    Locals:
+        r3: tile value / sprite id / sprite address offset
+        r9: pointer
+        r13: screen address
+*/
+drawing_clear_tile:
+    push r1
+    push r2
+    push r3
+    push r9
+    push r13
+
+    add r9, r1, map
+    push r2
+    drawing_clear_tile_row_loop:
+        cmp r2, 0
+        je drawing_clear_tile_row_loop_end
+        sub r2, r2, 1
+        add r9, r9, 15
+        jmp drawing_clear_tile_row_loop
+    drawing_clear_tile_row_loop_end:
+    pop r2
+
+    load_8 r3, [r9]
+    cmp r3, 2
+    add r9, zr, ptr_textures_addresses
+    jne drawing_clear_tile_get_screen_address
+    ; монета
+    mov r3, 10
+    lsl r3, r3, 2
+    add r9, r9, r3
+
+    drawing_clear_tile_get_screen_address:
+    call get_tile_address
+
+    mov r1, r13
+    load_32 r2, [r9]
+    mov r3, 0
+    call draw_sprite
+
+    pop r13
+    pop r9
+    pop r3
+    pop r2
+    pop r1
+    ret
+
+/* Return the top-left pixel address of the tile at the given map coordinates
+
+    Inputs:
+        r1: map x coord
+        r2: map y coord
+
+    Locals:
+        r3: counter
+        r4: offset per tile row (screen width * tile height)
+
+    Ouputs:
+        r13: the pixel address
+*/
+get_tile_address:
+    push r3
+    push r4
+
+    mov r3, 0
+    mov r4, 0
+    get_tile_address_offset_per_row_loop:
+        add r4, r4, 80
+        add r3, r3, 1
+        cmp r3, 5
+        jne get_tile_address_offset_per_row_loop
+
+    add r13, zr, visual_data
+
+    mov r3, 0
+    get_tile_address_margin_top_loop:
+        cmp r3, 2
+        je get_tile_address_margin_top_loop_end
+        add r13, r13, 80
+        add r3, r3, 1
+        jmp get_tile_address_margin_top_loop
+        get_tile_address_margin_top_loop_end:
+
+    mov r3, 0
+    get_tile_address_tile_row_loop:
+        cmp r3, r2
+        je get_tile_address_tile_row_loop_end
+        add r13, r13, r4
+        add r3, r3, 1
+        jmp get_tile_address_tile_row_loop
+        get_tile_address_tile_row_loop_end:
+
+    add r13, r13, 2
+    mov r3, 0
+    get_tile_address_tile_column_loop:
+        cmp r3, r1
+        je get_tile_address_tile_column_loop_end
+        add r13, r13, 5
+        add r3, r3, 1
+        jmp get_tile_address_tile_column_loop
+        get_tile_address_tile_column_loop_end:
+
+    pop r4
+    pop r3
+    ret
+
+
+/* Get address of given sprite id
+
+    Inputs:
+        r1: sprite id
+
+    Outputs:
+        r13: address
+
+    Locals:
+        r2: pointer address
+*/
+get_sprite_address:
+    push r1
+    push r2
+
+    cmp r1, 10
+    jbe get_sprite_address_ptr
+    mov r1, 1
+
+    get_sprite_address_ptr:
+    lsl r2, r1, 2
+    add r2, r2, ptr_textures_addresses
+    load_32 r13, [r2]
+
+    pop r2
+    pop r1
+    ret
+
+/* Draw given sprite on the screen at given map coordinates
+
+    Inputs:
+        r1: map x coord
+        r2: map y coord
+        r3: sprite id
+
+    Locals:
+        r1: screen address
+        r2: sprite address
+        r13: value returned by call to `get_tile_address` and `get_sprite_address`
+*/
+drawing_draw_sprite_at_map_coord:
+    push r1
+    push r2
+    push r3
+    push r13
+
+    call get_tile_address
+    push r13
+
+    mov r1, r3
+    call get_sprite_address
+
+    mov r2, r13
+    pop r13
+    mov r1, r13
+    call draw_sprite
+
+    pop r13
+    pop r3
+    pop r2
+    pop r1
+    ret
+
+/* Draw given sprite (by address) at given screen position (by address) with given rotation
+    Inputs:
+        r1: screen address
+        r2: sprite address
+
+    Locals:
+        r1: current screen pixel address
+        r2: current sprite pixel address
+        r3: x
+        r4: color
+        r5: sprite last pixel address + 1
+*/
+draw_sprite:
+    push r1
+    push r2
+    push r3
+    push r4
+    push r5
+
+    add r5, r2, 25
+
+    mov r3, 0
+    draw_sprite_loop:
+        load_8 r4, [r2]
+        store_8 [r1], r4
+
+        add r1, r1, 1
+        add r2, r2, 1
+        add r3, r3, 1
+        cmp r3, 5
+        jne draw_sprite_loop
+        mov r3, 0
+        add r1, r1, 80
+        sub r1, r1, 5
+        cmp r5, r2
+        jne draw_sprite_loop
+
+    pop r5
+    pop r4
+    pop r3
+    pop r2
+    pop r1
+    ret
+
+sprite_empty:
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+sprite_empty_end:
+U8 0 ; выравнивание для сохранения 32-битного выравнивания
+U8 0 ; выравнивание для сохранения 32-битного выравнивания
+U8 0 ; выравнивание для сохранения 32-битного выравнивания
+sprite_unimplemented:
+U8 227
+U8 0
+U8 227
+U8 0
+U8 227
+U8 0
+U8 227
+U8 227
+U8 227
+U8 0
+U8 227
+U8 227
+U8 0
+U8 227
+U8 227
+U8 0
+U8 227
+U8 227
+U8 227
+U8 0
+U8 227
+U8 0
+U8 227
+U8 0
+U8 227
+sprite_unimplemented_end:
+U8 0 ; выравнивание для сохранения 32-битного выравнивания
+U8 0 ; выравнивание для сохранения 32-битного выравнивания
+U8 0 ; выравнивание для сохранения 32-битного выравнивания
+sprite_robot_up:
+U8 0
+U8 110
+U8 110
+U8 110
+U8 0
+U8 0
+U8 110
+U8 110
+U8 110
+U8 0
+U8 224
+U8 110
+U8 110
+U8 110
+U8 224
+U8 0
+U8 110
+U8 110
+U8 110
+U8 0
+U8 0
+U8 224
+U8 0
+U8 224
+U8 0
+sprite_robot_up_end:
+U8 0 ; выравнивание для сохранения 32-битного выравнивания
+U8 0 ; выравнивание для сохранения 32-битного выравнивания
+U8 0 ; выравнивание для сохранения 32-битного выравнивания
+sprite_robot_right:
+U8 0
+U8 110
+U8 110
+U8 110
+U8 0
+U8 0
+U8 110
+U8 110
+U8 28
+U8 0
+U8 0
+U8 110
+U8 224
+U8 110
+U8 0
+U8 0
+U8 110
+U8 110
+U8 110
+U8 0
+U8 0
+U8 0
+U8 224
+U8 0
+U8 0
+sprite_robot_right_end:
+U8 0 ; выравнивание для сохранения 32-битного выравнивания
+U8 0 ; выравнивание для сохранения 32-битного выравнивания
+U8 0 ; выравнивание для сохранения 32-битного выравнивания
+sprite_robot_down:
+U8 0
+U8 110
+U8 110
+U8 110
+U8 0
+U8 0
+U8 28
+U8 110
+U8 28
+U8 0
+U8 224
+U8 110
+U8 110
+U8 110
+U8 224
+U8 0
+U8 110
+U8 110
+U8 110
+U8 0
+U8 0
+U8 224
+U8 0
+U8 224
+U8 0
+sprite_robot_down_end:
+U8 0 ; выравнивание для сохранения 32-битного выравнивания
+U8 0 ; выравнивание для сохранения 32-битного выравнивания
+U8 0 ; выравнивание для сохранения 32-битного выравнивания
+sprite_robot_left:
+U8 0
+U8 110
+U8 110
+U8 110
+U8 0
+U8 0
+U8 28
+U8 110
+U8 110
+U8 0
+U8 0
+U8 110
+U8 224
+U8 110
+U8 0
+U8 0
+U8 110
+U8 110
+U8 110
+U8 0
+U8 0
+U8 0
+U8 224
+U8 0
+U8 0
+sprite_robot_left_end:
+U8 0 ; выравнивание для сохранения 32-битного выравнивания
+U8 0 ; выравнивание для сохранения 32-битного выравнивания
+U8 0 ; выравнивание для сохранения 32-битного выравнивания
+sprite_ghost_up:
+U8 0
+U8 224
+U8 224
+U8 224
+U8 0
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 0
+U8 224
+U8 0
+U8 224
+sprite_ghost_up_end:
+U8 0 ; выравнивание для сохранения 32-битного выравнивания
+U8 0 ; выравнивание для сохранения 32-битного выравнивания
+U8 0 ; выравнивание для сохранения 32-битного выравнивания
+sprite_ghost_right:
+U8 0
+U8 224
+U8 224
+U8 224
+U8 0
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 3
+U8 224
+U8 3
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 0
+U8 224
+U8 0
+U8 224
+sprite_ghost_right_end:
+U8 0 ; выравнивание для сохранения 32-битного выравнивания
+U8 0 ; выравнивание для сохранения 32-битного выравнивания
+U8 0 ; выравнивание для сохранения 32-битного выравнивания
+sprite_ghost_down:
+U8 0
+U8 224
+U8 224
+U8 224
+U8 0
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 3
+U8 224
+U8 3
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 0
+U8 224
+U8 0
+U8 224
+sprite_ghost_down_end:
+U8 0 ; выравнивание для сохранения 32-битного выравнивания
+U8 0 ; выравнивание для сохранения 32-битного выравнивания
+U8 0 ; выравнивание для сохранения 32-битного выравнивания
+sprite_ghost_left:
+U8 0
+U8 224
+U8 224
+U8 224
+U8 0
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 3
+U8 224
+U8 3
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 0
+U8 224
+U8 0
+U8 224
+sprite_ghost_left_end:
+U8 0 ; выравнивание для сохранения 32-битного выравнивания
+U8 0 ; выравнивание для сохранения 32-битного выравнивания
+U8 0 ; выравнивание для сохранения 32-битного выравнивания
+sprite_coin:
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 240
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+sprite_coin_end:
+U8 0 ; выравнивание для сохранения 32-битного выравнивания
+U8 0 ; выравнивание для сохранения 32-битного выравнивания
+U8 0 ; выравнивание для сохранения 32-битного выравнивания
+
+map:
+U8 1
+U8 1
+U8 1
+U8 1
+U8 1
+U8 1
+U8 1
+U8 1
+U8 1
+U8 1
+U8 1
+U8 1
+U8 1
+U8 1
+U8 1
+U8 1
+U8 2
+U8 2
+U8 2
+U8 2
+U8 2
+U8 2
+U8 2
+U8 2
+U8 2
+U8 2
+U8 2
+U8 2
+U8 2
+U8 1
+U8 1
+U8 2
+U8 1
+U8 1
+U8 1
+U8 2
+U8 1
+U8 1
+U8 1
+U8 2
+U8 1
+U8 1
+U8 1
+U8 2
+U8 1
+U8 1
+U8 2
+U8 2
+U8 2
+U8 1
+U8 2
+U8 2
+U8 2
+U8 2
+U8 2
+U8 1
+U8 2
+U8 2
+U8 2
+U8 1
+U8 1
+U8 2
+U8 1
+U8 2
+U8 1
+U8 1
+U8 2
+U8 1
+U8 2
+U8 1
+U8 1
+U8 2
+U8 1
+U8 2
+U8 1
+U8 1
+U8 2
+U8 1
+U8 2
+U8 2
+U8 2
+U8 2
+U8 1
+U8 2
+U8 2
+U8 2
+U8 2
+U8 1
+U8 2
+U8 1
+U8 1
+U8 2
+U8 1
+U8 2
+U8 1
+U8 1
+U8 2
+U8 1
+U8 2
+U8 1
+U8 1
+U8 2
+U8 1
+U8 2
+U8 1
+U8 1
+U8 2
+U8 2
+U8 2
+U8 1
+U8 2
+U8 2
+U8 2
+U8 2
+U8 2
+U8 1
+U8 2
+U8 2
+U8 2
+U8 1
+U8 1
+U8 2
+U8 1
+U8 1
+U8 1
+U8 2
+U8 1
+U8 1
+U8 1
+U8 2
+U8 1
+U8 1
+U8 1
+U8 2
+U8 1
+U8 1
+U8 2
+U8 2
+U8 2
+U8 2
+U8 2
+U8 2
+U8 2
+U8 2
+U8 2
+U8 2
+U8 2
+U8 2
+U8 2
+U8 1
+U8 1
+U8 1
+U8 1
+U8 1
+U8 1
+U8 1
+U8 1
+U8 1
+U8 1
+U8 1
+U8 1
+U8 1
+U8 1
+U8 1
+U8 1
+map_end:
+U8 0 ; выравнивание для сохранения 32-битного выравнивания
+U8 0 ; выравнивание для сохранения 32-битного выравнивания
+U8 0 ; выравнивание для сохранения 32-битного выравнивания
+
+; Таблица переходов адресов спрайтов
+ptr_textures_addresses:
+U32 0 ; пусто
+U32 0 ; заглушка
+U32 0 ; робот вверх
+U32 0 ; робот вправо
+U32 0 ; робот вниз
+U32 0 ; робот влево
+U32 0 ; призрак вверх
+U32 0 ; призрак вправо
+U32 0 ; призрак вниз
+U32 0 ; призрак влево
+U32 0 ; монета
+
+; 0.5 секунды = 500_000_000 наносекунд = 0x0000_0000_1DCD_6500
+ptr_cycle_duration_high: U32 0x0000_0000
+ptr_cycle_duration_low:  U32 0x1DCD_6500
+
+; 1 секунда = 1_000_000_000 наносекунд = 0x0000_0000_3B9A_CA00
+; ptr_cycle_duration_high: U32 0x0000_0000
+; ptr_cycle_duration_low:  U32 0x3B9A_CA00
+
+ptr_timer_robot_next_cycle_high: U32 0x0000_0000
+ptr_timer_robot_next_cycle_low: U32 0x1DCD_6500
+
+ptr_timer_ghost_next_cycle_high: U32 0
+ptr_timer_ghost_next_cycle_low: U32 0x0EE6_B280
+
+ptr_state_robot:
+U8 0 ; координата x
+U8 0 ; координата y
+U8 0 ; направление
+U8 0 ; [выравнивание]
+
+ptr_state_ghost:
+U8 0 ; координата x
+U8 0 ; координата y
+U8 0 ; направление
+U8 0 ; [выравнивание]
+
+visual_data:
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 240
+U8 0
+U8 0
+U8 0
+U8 0
+U8 240
+U8 0
+U8 0
+U8 0
+U8 0
+U8 240
+U8 0
+U8 0
+U8 0
+U8 0
+U8 240
+U8 0
+U8 0
+U8 0
+U8 0
+U8 240
+U8 0
+U8 0
+U8 0
+U8 0
+U8 240
+U8 0
+U8 0
+U8 0
+U8 0
+U8 240
+U8 0
+U8 0
+U8 0
+U8 0
+U8 240
+U8 0
+U8 0
+U8 0
+U8 0
+U8 240
+U8 0
+U8 0
+U8 0
+U8 0
+U8 240
+U8 0
+U8 0
+U8 0
+U8 0
+U8 240
+U8 0
+U8 0
+U8 0
+U8 0
+U8 240
+U8 0
+U8 0
+U8 0
+U8 0
+U8 240
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 240
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 240
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 240
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 240
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 240
+U8 0
+U8 0
+U8 0
+U8 0
+U8 240
+U8 0
+U8 0
+U8 0
+U8 0
+U8 240
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 240
+U8 0
+U8 0
+U8 0
+U8 0
+U8 240
+U8 0
+U8 0
+U8 0
+U8 0
+U8 240
+U8 0
+U8 0
+U8 0
+U8 0
+U8 240
+U8 0
+U8 0
+U8 0
+U8 0
+U8 240
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 240
+U8 0
+U8 0
+U8 0
+U8 0
+U8 240
+U8 0
+U8 0
+U8 0
+U8 0
+U8 240
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 240
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 240
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 240
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 240
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 240
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 240
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 240
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 240
+U8 0
+U8 0
+U8 0
+U8 0
+U8 240
+U8 0
+U8 0
+U8 0
+U8 0
+U8 240
+U8 0
+U8 0
+U8 0
+U8 0
+U8 240
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 240
+U8 0
+U8 0
+U8 0
+U8 0
+U8 240
+U8 0
+U8 0
+U8 0
+U8 0
+U8 240
+U8 0
+U8 0
+U8 0
+U8 0
+U8 240
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 240
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 240
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 240
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 240
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 240
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 240
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 240
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 240
+U8 0
+U8 0
+U8 0
+U8 0
+U8 240
+U8 0
+U8 0
+U8 0
+U8 0
+U8 240
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 240
+U8 0
+U8 0
+U8 0
+U8 0
+U8 240
+U8 0
+U8 0
+U8 0
+U8 0
+U8 240
+U8 0
+U8 0
+U8 0
+U8 0
+U8 240
+U8 0
+U8 0
+U8 0
+U8 0
+U8 240
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 240
+U8 0
+U8 0
+U8 0
+U8 0
+U8 240
+U8 0
+U8 0
+U8 0
+U8 0
+U8 240
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 240
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 240
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 240
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 240
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 240
+U8 0
+U8 0
+U8 0
+U8 0
+U8 240
+U8 0
+U8 0
+U8 0
+U8 0
+U8 240
+U8 0
+U8 0
+U8 0
+U8 0
+U8 240
+U8 0
+U8 0
+U8 0
+U8 0
+U8 240
+U8 0
+U8 0
+U8 0
+U8 0
+U8 240
+U8 0
+U8 0
+U8 0
+U8 0
+U8 240
+U8 0
+U8 0
+U8 0
+U8 0
+U8 240
+U8 0
+U8 0
+U8 0
+U8 0
+U8 240
+U8 0
+U8 0
+U8 0
+U8 0
+U8 240
+U8 0
+U8 0
+U8 0
+U8 0
+U8 240
+U8 0
+U8 0
+U8 0
+U8 0
+U8 240
+U8 0
+U8 0
+U8 0
+U8 0
+U8 240
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 224
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 3
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+U8 0
+visual_data_end:
+U8 0 ; выравнивание для сохранения 32-битного выравнивания
+U8 0 ; выравнивание для сохранения 32-битного выравнивания
+U8 0 ; выравнивание для сохранения 32-битного выравнивания
+U8 0 ; выравнивание для сохранения 32-битного выравнивания

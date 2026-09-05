@@ -1,0 +1,21 @@
+На входе этого уровня — предложения в кодировке ASCII ([link="Computer concepts/ASCII encoding"]см. руководство[/link]). Каждое слово отделено пробелом (числовой код 32). Замените первую букву каждого слова на заглавную.
+
+Возможные входные символы — строчные a–z и пробел.
+
+
+
+const letter = r1
+const saw_space = r2
+mov saw_space, 1
+label:
+in letter
+mul saw_space,saw_space,32
+sub letter,letter,saw_space
+out letter
+mov saw_space, 0
+cmp letter,32
+jne label
+mov saw_space, 1
+jmp label
+
+

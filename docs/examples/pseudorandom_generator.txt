@@ -1,0 +1,34 @@
+На этом уровне у вас только один вход — мы называем его начальным зерном. Зерно проходит следующие шаги и превращается в псевдослучайное число.
+
+[b]32-битный xorshift ГСЧ:[/b]
+[box][left]
+temp1  = seed  xor (seed  lsr 13)
+temp2  = temp1 xor (temp1 lsl 17)
+result = temp2 xor (temp2 lsr 5)
+[/left][/box]
+
+В конце выведите «result» и используйте его как зерно для следующей итерации.
+
+
+const seed = r1
+const t1 = r2
+const t2 = r3
+const res = r4
+const x = r5
+
+
+in seed
+loop:
+lsr x,seed,13
+xor t1,seed,x
+
+lsl x,t1,17
+xor t2,t1,x
+
+lsr x,t2,5
+xor res,t2,x
+
+out res
+mov seed,res
+jmp loop
+
