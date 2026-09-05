@@ -156,11 +156,29 @@ cmp %a(register), %b:U16(immediate)
 
 mul %a(register), %b(register), %c(register)
 00101011 aaaabbbb 0000cccc 00000000
-# Умножает %b и %c, результат сохраняет в %a.
+# Умножает %b на %c, результат сохраняет в %a.
 
 mul %a(register), %b(register), %c:U16(immediate | label)
 00111011 aaaabbbb cccccccc cccccccc
-# Умножает %b и %c, результат сохраняет в %a.
+# Умножает %b на %c, результат сохраняет в %a.
+
+
+div %a(register), %b(register), %c(register)
+00101100 aaaabbbb 0000cccc 00000000
+# Делит %b на %c, результат сохраняет в %a.
+
+div %a(register), %b(register), %c:U16(immediate | label)
+00111100 aaaabbbb cccccccc cccccccc
+# Делит %b на %c, результат сохраняет в %a.
+
+mod %a(register), %b(register), %c(register)
+00101101 aaaabbbb 0000cccc 00000000
+# Остаток от деления %b на %c, результат сохраняет в %a.
+
+mod %a(register), %b(register), %c:U16(immediate | label)
+00111101 aaaabbbb cccccccc cccccccc
+# Остаток от деления %b на %c, результат сохраняет в %a.
+
 
 
 jmp %a(register)

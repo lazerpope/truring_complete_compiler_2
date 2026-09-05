@@ -1,0 +1,37 @@
+# Confirmed TuringScript hardware API examples
+
+# General input: returns the current value from the computer input.
+let inputValue = input()
+
+# General output: accepts a variable or a U16 literal.
+output(inputValue)
+output(42)
+
+# Keyboard: returns the packed keyboard state/value word.
+let key = keyboard()
+
+# Screen: first argument is the setting index, second is its value.
+let screenSetting = 0
+screen(screenSetting, key)
+screen(screenSetting, 255)
+
+# Timer: timeLow captures the low word and latches the matching high word.
+# Read timeHigh after timeLow to obtain the corresponding high word.
+let timeLow = time_0()
+let timeHigh = time_1()
+
+# Instruction counter: returns the current counter value.
+let instructionCounter = counter()
+
+# Hardware reads can also be used directly as statement initializers.
+let nextKey = keyboard()
+let nextInput = input()
+
+# Nested hardware reads are allowed and lowered to generated temporaries.
+let incrementedKey = keyboard() + 1
+
+if (keyboard() != 0) {
+  output(1)
+}
+
+screen(screenSetting, keyboard())

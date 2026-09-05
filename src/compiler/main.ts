@@ -1,5 +1,5 @@
 import { doStep as removeWhitespaces } from './precompiler/removeWhitespaces'
-import { doStep as testPipeline } from './pipelines/test'
+import { doStep as compileCanonical } from './pipelines/compileCanonical'
 import {
   CompilerError,
   isCompilerError,
@@ -60,6 +60,6 @@ export const compiler = new Compiler()
 
 compiler.registerPrecompiler(removeWhitespaces)
 
-compiler.registerPipeline(testPipeline)
+compiler.registerPipeline(compileCanonical)
 
 export const compile = (source: string): CompilerResult => compiler.compile(source)

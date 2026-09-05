@@ -1,0 +1,536 @@
+import { CompilerError } from '../compilerError'
+import type {
+  ArrayAccessExpression,
+  AssignmentTarget,
+  BinaryExpression,
+  BinaryOperator,
+  Expression,
+  Program,
+  SourceLocation,
+  Statement,
+} from '../language/ast'
+import { parseCanonical } from '../language/parseCanonical'
+
+interface SymbolInfo {
+  name: string
+  kind: 'scalar' | 'array'
+  address: number
+  size: number
+  location: SourceLocation
+}
+
+interface LoopLabels {
+  breakLabel: string
+  continueLabel: string
+}
+
+const BINARY_INSTRUCTIONS: Partial<Record<BinaryOperator, string>> = {
+  '*': 'mul',
+  '/': 'div',
+  '%': 'mod',
+  '+': 'add',
+  '-': 'sub',
+  '<<': 'lsl',
+  '>>': 'lsr',
+  's>>': 'asr',
+  '&': 'and',
+  '^': 'xor',
+  '|': 'or',
+  '&&': 'and',
+  '||': 'or',
+}
+
+const COMPARISON_JUMPS: Partial<Record<BinaryOperator, string>> = {
+  '==': 'je',
+  '===': 'je',
+  '!=': 'jne',
+  '!==': 'jne',
+  '<': 'jb',
+  '>=': 'jae',
+  '<=': 'jbe',
+  '>': 'ja',
+  's<': 'jl',
+  's>=': 'jge',
+  's<=': 'jle',
+  's>': 'jg',
+}
+
+const isComparison = (operator: BinaryOperator): boolean => operator in COMPARISON_JUMPS
+
+export function doStep(source: string): string {
+  const program = parseCanonical(source)
+  return new AssemblyCompiler(program).compile()
+}
+
+class AssemblyCompiler {
+  private readonly lines: string[] = []
+  private readonly symbols = new Map<string, SymbolInfo>()
+  private readonly declared = new Set<string>()
+  private readonly registers = new RegisterPool()
+  private readonly loops: LoopLabels[] = []
+  private labelCounter = 0
+  private nextAddress = 0
+
+  constructor(private readonly program: Program) {
+    this.allocateStatements(program.statements)
+  }
+
+  compile(): string {
+    this.compileStatements(this.program.statements)
+    return this.lines.join('\n')
+  }
+
+  private allocateStatements(statements: readonly Statement[]): void {
+    for (const statement of statements) {
+      if (statement.type === 'declaration') {
+        if (this.symbols.has(statement.name)) {
+          throw this.error(statement.location, `Duplicate declaration of ${statement.name}`)
+        }
+        const isArray = statement.initializer.type === 'arrayCreation'
+        const size = statement.initializer.type === 'arrayCreation' ? statement.initializer.size : 1
+        this.symbols.set(statement.name, {
+          name: statement.name,
+          kind: isArray ? 'array' : 'scalar',
+          address: this.nextAddress,
+          size,
+          location: statement.location,
+        })
+        this.nextAddress += size * 4
+      } else if (statement.type === 'if') {
+        this.allocateStatements(statement.thenBranch)
+        if (statement.elseBranch) this.allocateStatements(statement.elseBranch)
+      } else if (statement.type === 'while') {
+        this.allocateStatements(statement.body)
+      }
+    }
+  }
+
+  private compileStatements(statements: readonly Statement[]): void {
+    for (const statement of statements) this.compileStatementWithComment(statement)
+  }
+
+  private compileStatementWithComment(statement: Statement): void {
+    const firstLine = this.lines.length
+    this.compileStatement(statement)
+    if (!statement.trailingComment) return
+
+    const comment = this.toAssemblyComment(statement.trailingComment)
+    if (this.lines.length > firstLine) {
+      this.lines[firstLine] = `${this.lines[firstLine]} ${comment}`
+    } else {
+      this.lines.push(comment)
+    }
+  }
+
+  private compileStatement(statement: Statement): void {
+    switch (statement.type) {
+      case 'comment':
+        this.emitComment(statement.text)
+        return
+      case 'declaration':
+        this.compileDeclaration(statement)
+        return
+      case 'assignment':
+        this.compileAssignment(statement.target, statement.value)
+        return
+      case 'hardwareWrite':
+        this.compileHardwareWrite(statement.operation, statement.arguments, statement.location)
+        return
+      case 'if':
+        this.compileIf(statement)
+        return
+      case 'while':
+        this.compileWhile(statement)
+        return
+      case 'break': {
+        const loop = this.loops[this.loops.length - 1]
+        if (!loop) throw this.error(statement.location, 'break is only valid inside a loop')
+        this.emit(`jmp ${loop.breakLabel}`)
+        return
+      }
+      case 'continue': {
+        const loop = this.loops[this.loops.length - 1]
+        if (!loop) throw this.error(statement.location, 'continue is only valid inside a loop')
+        this.emit(`jmp ${loop.continueLabel}`)
+      }
+    }
+  }
+
+  private compileDeclaration(statement: Extract<Statement, { type: 'declaration' }>): void {
+    const symbol = this.symbols.get(statement.name)!
+    this.declared.add(statement.name)
+    if (symbol.kind === 'array') return
+
+    const value = this.compileExpression(statement.initializer as Expression)
+    this.storeSymbol(symbol, value)
+    this.registers.release(value)
+  }
+
+  private compileAssignment(target: AssignmentTarget, expression: Expression): void {
+    if (target.type === 'identifier') {
+      const symbol = this.requireDeclared(target.name, target.location)
+      if (symbol.kind === 'array') throw this.error(target.location, `Array ${target.name} cannot be reassigned`)
+      const value = this.compileExpression(expression)
+      this.storeSymbol(symbol, value)
+      this.registers.release(value)
+      return
+    }
+
+    const address = this.compileArrayAddress(target)
+    const value = this.compileExpression(expression)
+    this.emit(`pstore [${address}], ${value}`)
+    this.registers.release(value)
+    this.registers.release(address)
+  }
+
+  private compileHardwareWrite(
+    operation: 'output' | 'screen',
+    args: readonly Expression[],
+    location: SourceLocation,
+  ): void {
+    if (operation === 'output') {
+      if (args.length !== 1) throw this.error(location, 'output requires exactly one argument')
+      const value = args[0]
+      if (value?.type === 'literal' && value.value <= 0xffff) {
+        this.emit(`out ${value.value}`)
+        return
+      }
+      const register = this.compileExpression(this.requiredExpression(value, location))
+      this.emit(`out ${register}`)
+      this.registers.release(register)
+      return
+    }
+
+    if (args.length !== 2) throw this.error(location, 'screen requires exactly two arguments')
+    const setting = this.compileExpression(this.requiredExpression(args[0], location))
+    const valueExpression = this.requiredExpression(args[1], location)
+    if (valueExpression.type === 'literal' && valueExpression.value <= 0xffff) {
+      this.emit(`screen ${setting}, ${valueExpression.value}`)
+      this.registers.release(setting)
+      return
+    }
+    const value = this.compileExpression(valueExpression)
+    this.emit(`screen ${setting}, ${value}`)
+    this.registers.release(value)
+    this.registers.release(setting)
+  }
+
+  private compileIf(statement: Extract<Statement, { type: 'if' }>): void {
+    const elseLabel = this.label('if_else')
+    const endLabel = this.label('if_end')
+    this.compileCondition(statement.condition, undefined, elseLabel)
+    this.compileStatements(statement.thenBranch)
+    if (statement.elseBranch) {
+      this.emit(`jmp ${endLabel}`)
+      this.emitLabel(elseLabel)
+      this.compileStatements(statement.elseBranch)
+      this.emitLabel(endLabel)
+    } else {
+      this.emitLabel(elseLabel)
+    }
+  }
+
+  private compileWhile(statement: Extract<Statement, { type: 'while' }>): void {
+    const conditionLabel = this.label('while_condition')
+    const bodyLabel = this.label('while_body')
+    const endLabel = this.label('while_end')
+    this.emitLabel(conditionLabel)
+    this.compileCondition(statement.condition, bodyLabel, endLabel)
+    this.emitLabel(bodyLabel)
+    this.loops.push({ breakLabel: endLabel, continueLabel: conditionLabel })
+    this.compileStatements(statement.body)
+    this.loops.pop()
+    this.emit(`jmp ${conditionLabel}`)
+    this.emitLabel(endLabel)
+  }
+
+  private compileCondition(expression: Expression, trueLabel: string | undefined, falseLabel: string): void {
+    if (expression.type === 'binary' && expression.operator === '&&') {
+      const rightLabel = this.label('and_right')
+      this.compileCondition(expression.left, rightLabel, falseLabel)
+      this.emitLabel(rightLabel)
+      this.compileCondition(expression.right, trueLabel, falseLabel)
+      return
+    }
+
+    if (expression.type === 'binary' && expression.operator === '||') {
+      const rightLabel = this.label('or_right')
+      const resolvedTrue = trueLabel ?? this.label('or_true')
+      this.compileCondition(expression.left, resolvedTrue, rightLabel)
+      this.emitLabel(rightLabel)
+      this.compileCondition(expression.right, resolvedTrue, falseLabel)
+      if (!trueLabel) this.emitLabel(resolvedTrue)
+      return
+    }
+
+    if (expression.type === 'binary' && isComparison(expression.operator)) {
+      const left = this.compileExpression(expression.left)
+      const right = this.compileExpression(expression.right)
+      this.emit(`cmp ${left}, ${right}`)
+      this.registers.release(right)
+      this.registers.release(left)
+      if (trueLabel) this.emit(`${COMPARISON_JUMPS[expression.operator]} ${trueLabel}`)
+      else this.emit(`${this.inverseJump(expression.operator)} ${falseLabel}`)
+      if (trueLabel) this.emit(`jmp ${falseLabel}`)
+      return
+    }
+
+    const value = this.compileExpression(expression)
+    this.emit(`cmp ${value}, 0`)
+    this.registers.release(value)
+    if (trueLabel) {
+      this.emit(`jne ${trueLabel}`)
+      this.emit(`jmp ${falseLabel}`)
+    } else {
+      this.emit(`je ${falseLabel}`)
+    }
+  }
+
+  private compileExpression(expression: Expression): string {
+    switch (expression.type) {
+      case 'literal': {
+        const register = this.registers.acquire(expression.location)
+        this.emitImmediate(register, expression.value)
+        return register
+      }
+      case 'identifier': {
+        const symbol = this.requireDeclared(expression.name, expression.location)
+        if (symbol.kind === 'array') {
+          throw this.error(expression.location, `Array ${expression.name} may only be indexed`)
+        }
+        const register = this.registers.acquire(expression.location)
+        this.loadSymbol(register, symbol)
+        return register
+      }
+      case 'arrayAccess': {
+        const address = this.compileArrayAddress(expression)
+        this.emit(`pload ${address}, [${address}]`)
+        return address
+      }
+      case 'hardwareRead': {
+        const register = this.registers.acquire(expression.location)
+        const instruction = expression.operation === 'input' ? 'in' : expression.operation
+        this.emit(`${instruction} ${register}`)
+        return register
+      }
+      case 'unary': {
+        const register = this.compileExpression(expression.operand)
+        if (expression.operator === '-') this.emit(`neg ${register}, ${register}`)
+        else if (expression.operator === '~') this.emit(`not ${register}, ${register}`)
+        else {
+          this.emit(`cmp ${register}, 0`)
+          this.emit(`and ${register}, flags, 1`)
+        }
+        return register
+      }
+      case 'binary':
+        return this.compileBinary(expression)
+    }
+  }
+
+  private compileBinary(expression: BinaryExpression): string {
+    if (isComparison(expression.operator)) return this.compileComparisonValue(expression)
+
+    const instruction = BINARY_INSTRUCTIONS[expression.operator]
+    if (!instruction) throw this.error(expression.location, `Unsupported operator ${expression.operator}`)
+    const left = this.compileExpression(expression.left)
+    const right = this.compileExpression(expression.right)
+    this.emit(`${instruction} ${left}, ${left}, ${right}`)
+    this.registers.release(right)
+    return left
+  }
+
+  private compileComparisonValue(expression: BinaryExpression): string {
+    const left = this.compileExpression(expression.left)
+    const right = this.compileExpression(expression.right)
+    this.emit(`cmp ${left}, ${right}`)
+
+    const operator = expression.operator
+    if (operator === '==' || operator === '===') {
+      this.emit(`and ${left}, flags, 1`)
+      this.registers.release(right)
+      return left
+    }
+    if (operator === '!=' || operator === '!==') {
+      this.emit(`and ${left}, flags, 1`)
+      this.emit(`xor ${left}, ${left}, 1`)
+      this.registers.release(right)
+      return left
+    }
+
+    const signed = operator.startsWith('s')
+    const normalized = signed ? operator.slice(1) : operator
+    const bit = signed ? 2 : 1
+    this.emit(`lsr ${right}, flags, ${bit}`)
+    this.emit(`and ${right}, ${right}, 1`)
+
+    if (normalized === '<') {
+      this.registers.release(left)
+      return right
+    }
+    if (normalized === '>=') {
+      this.emit(`xor ${right}, ${right}, 1`)
+      this.registers.release(left)
+      return right
+    }
+
+    this.emit(`and ${left}, flags, 1`)
+    this.emit(`or ${left}, ${left}, ${right}`)
+    this.registers.release(right)
+    if (normalized === '>') this.emit(`xor ${left}, ${left}, 1`)
+    return left
+  }
+
+  private compileArrayAddress(expression: ArrayAccessExpression): string {
+    const symbol = this.requireDeclared(expression.name, expression.location)
+    if (symbol.kind !== 'array') throw this.error(expression.location, `${expression.name} is not an array`)
+
+    if (expression.index.type === 'literal') {
+      if (expression.index.value >= symbol.size) {
+        throw this.error(expression.index.location, `Array index ${expression.index.value} is outside ${expression.name}`)
+      }
+      const address = this.registers.acquire(expression.location)
+      this.emitImmediate(address, symbol.address + expression.index.value * 4)
+      return address
+    }
+
+    const index = this.compileExpression(expression.index)
+    this.emit(`lsl ${index}, ${index}, 2`)
+    if (symbol.address !== 0) {
+      if (symbol.address <= 0xffff) this.emit(`add ${index}, ${index}, ${symbol.address}`)
+      else {
+        const base = this.registers.acquire(expression.location)
+        this.emitImmediate(base, symbol.address)
+        this.emit(`add ${index}, ${index}, ${base}`)
+        this.registers.release(base)
+      }
+    }
+    return index
+  }
+
+  private requireDeclared(name: string, location: SourceLocation): SymbolInfo {
+    const symbol = this.symbols.get(name)
+    if (!symbol || !this.declared.has(name)) throw this.error(location, `Read of ${name} before declaration`)
+    return symbol
+  }
+
+  private loadSymbol(target: string, symbol: SymbolInfo): void {
+    if (symbol.address <= 0xffff) {
+      this.emit(`pload ${target}, [${symbol.address}]`)
+      return
+    }
+    this.emitImmediate(target, symbol.address)
+    this.emit(`pload ${target}, [${target}]`)
+  }
+
+  private storeSymbol(symbol: SymbolInfo, value: string): void {
+    if (symbol.address <= 0xffff) {
+      this.emit(`pstore [${symbol.address}], ${value}`)
+      return
+    }
+    const address = this.registers.acquire(symbol.location)
+    this.emitImmediate(address, symbol.address)
+    this.emit(`pstore [${address}], ${value}`)
+    this.registers.release(address)
+  }
+
+  private emitImmediate(register: string, value: number): void {
+    if (value <= 0xffff) {
+      this.emit(`mov ${register}, ${value}`)
+      return
+    }
+    const high = Math.floor(value / 0x10000) & 0xffff
+    const low = value & 0xffff
+    this.emit(`mov ${register}, ${high}`)
+    this.emit(`lsl ${register}, ${register}, 16`)
+    if (low !== 0) this.emit(`or ${register}, ${register}, ${low}`)
+  }
+
+  private inverseJump(operator: BinaryOperator): string {
+    const inverse: Partial<Record<BinaryOperator, string>> = {
+      '==': 'jne',
+      '===': 'jne',
+      '!=': 'je',
+      '!==': 'je',
+      '<': 'jae',
+      '>=': 'jb',
+      '<=': 'ja',
+      '>': 'jbe',
+      's<': 'jge',
+      's>=': 'jl',
+      's<=': 'jg',
+      's>': 'jle',
+    }
+    const jump = inverse[operator]
+    if (!jump) throw new CompilerError(`Cannot invert comparison ${operator}`)
+    return jump
+  }
+
+  private requiredExpression(expression: Expression | undefined, location: SourceLocation): Expression {
+    if (!expression) throw this.error(location, 'Missing expression')
+    return expression
+  }
+
+  private label(purpose: string): string {
+    const label = `__ts_${purpose}_${this.labelCounter}`
+    this.labelCounter += 1
+    return label
+  }
+
+  private emitLabel(label: string): void {
+    this.lines.push(`${label}:`)
+  }
+
+  private emit(line: string): void {
+    this.lines.push(line)
+  }
+
+  private emitComment(comment: string): void {
+    for (const line of comment.split('\n')) this.lines.push(this.toAssemblyComment(line))
+  }
+
+  private toAssemblyComment(comment: string): string {
+    if (comment.startsWith('//')) return `#${comment.slice(2)}`
+    if (comment.startsWith('#')) return comment
+    return `# ${comment}`
+  }
+
+  private error(location: SourceLocation, reason: string): CompilerError {
+    return new CompilerError(`Line ${location.line}, column ${location.column}: ${reason}`)
+  }
+}
+
+class RegisterPool {
+  private readonly available = [
+    'r13',
+    'r12',
+    'r11',
+    'r10',
+    'r9',
+    'r8',
+    'r7',
+    'r6',
+    'r5',
+    'r4',
+    'r3',
+    'r2',
+    'r1',
+  ]
+  private readonly allocated = new Set<string>()
+
+  acquire(location: SourceLocation): string {
+    const register = this.available.pop()
+    if (!register) {
+      throw new CompilerError(
+        `Line ${location.line}, column ${location.column}: Expression requires more available registers`,
+      )
+    }
+    this.allocated.add(register)
+    return register
+  }
+
+  release(register: string): void {
+    if (!this.allocated.delete(register)) return
+    this.available.push(register)
+  }
+}

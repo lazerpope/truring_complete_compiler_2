@@ -1,375 +1,711 @@
 # TuringScript Language Specification
 
-Status: Draft 0.1  
+Status: Draft 0.4
 Language ID: `turingScript`  
 Target: Symphony assembly (`docs/spec`)
 
-This document is the source of truth for the TuringScript language. Compiler behavior must not be implemented from a proposal or an open question. A feature becomes normative only after it is moved into a confirmed section.
+This document is the source of truth for TuringScript. Sections marked **Confirmed** are normative. Sections marked **Paused** or **Open** must not be implemented until their decisions are confirmed.
 
 ## 1. Language goals
 
 ### Confirmed
 
-- TuringScript uses JavaScript syntax and compiles ahead of time to Symphony assembly.
-- Compilation produces assembly text, not machine-code bytes.
-- The compiler is deterministic: the same source and compiler version must produce the same assembly.
-- The compiler has two ordered phases: precompilers, then pipelines.
-- Every compiler step accepts a string and returns a string.
-- Steps within a phase execute in registration order.
+- TuringScript is a small, statically compilable, JavaScript-like language.
+- It compiles ahead of time to Symphony assembly text, not machine-code bytes.
+- It is not a complete ECMAScript implementation.
+- Unsupported JavaScript syntax must produce a compiler error rather than being silently reinterpreted.
+- Compilation is deterministic: the same source and compiler version produce the same assembly.
+- The final assembly compiler must remain lean. Source conveniences and newly registered source features should be lowered by precompilers whenever possible.
+- Features requiring a JavaScript runtime, garbage collector, dynamic object model, prototype chain, or `eval` are prohibited.
+- Modules, imports, exports, exceptions, generators, async code, string values, floating-point values, regular expressions, template literals, object literals, and dynamic objects are prohibited.
 
-### Proposed
+## 2. Compiler contract and execution order
 
-- TuringScript is a deliberately small, statically compilable JavaScript subset rather than a complete ECMAScript implementation.
-- Accepted TuringScript should look and behave like JavaScript wherever the target machine permits it.
-- Features that require a JavaScript runtime, garbage collector, dynamic object model, prototype chain, or `eval` are outside the initial language.
+### Confirmed
 
-## 2. Source text and lexical structure
+The public compiler and every registered step use this result contract:
 
-### Proposed
-
-- Source files are UTF-8 text.
-- Line endings may be LF or CRLF and are normalized to LF internally.
-- JavaScript whitespace is accepted between tokens.
-- Single-line comments use `//` or '#''.
-- Block comments use `/* ... */`.
-- Identifiers use the JavaScript identifier form restricted initially to ASCII: `[A-Za-z_$][A-Za-z0-9_$]*`.
-- Reserved JavaScript keywords cannot be used as identifiers.
-- A semicolon removed during precompilation.
-- Automatic semicolon insertion is not permitted
-
-### Important precompiler constraint
-
-Comments cannot be rewritten and must be preseerved alongside their placement inside source code.
-For example "let x = 123 // initial value" should be preserved as "compiled code // initial value" even if compiled code produces multiline code like 
-"""
-compiled code // initial value
-compiled code 
-compiled code 
-compiled code 
-"""
-
-Whitespace will be removed by precompiler for consistency. For example, spaces inside `"a  b c"` removed by precompiler to a single whitespace  `"a b c"`
-
-## 3. Program structure
-
-### Proposed grammar
-
-The notation below is descriptive, not yet normative EBNF.
-
-```text
-Program          ::= Statement*
-Statement        ::= VariableDeclaration
-                   | ExpressionStatement
-                   | BlockStatement
-                   | IfStatement
-                   | WhileStatement
-                   | ForStatement
-                   | FunctionDeclaration
-                   | ReturnStatement
-                   | BreakStatement
-                   | ContinueStatement
-                   | EmptyStatement
-BlockStatement   ::= "{" Statement* "}"
-```
-
-Modules, imports, exports, classes, exceptions, generators, and async code are not allowed
-
-## 4. Values and types
-
-### Open
-
-The target specification defines register names and instruction encodings but does not explicitly define the language-level numeric model. Before expressions can be specified, the following must be decided:
-
-
-
-
-## 5. Literals
-
-### Proposed
-
-- Decimal integer literals: `0`, `1`, `42`.
-- Hexadecimal integer literals: `0xff`.
-- Binary integer literals: `0b1010`.
-- Boolean literals: `true`, `false`.
-- Negative values are parsed as unary negation applied to a positive integer literal.
-
-String, array, object, template, regular-expression, bigint, and floating-point literals remain open or unsupported for the initial version.
-
-## 6. Variables and scope
-
-### SIGNES
-
-computer uses 32 bit architecture for all of its components
-and dont differentiate between datatypes
-
-compiler should use memory tracking for variables and arrays and never dispose of memory because its practically infinite
-variable laways size of 32 bit arrays dont support resizing and always should specify size on creation and tracked alongside normal  variables
-
-example 
-```js
-let counter = 0; // occupies 0 slot in memory
-const limit = 10; // occupies 1 slot in memory
-let arr = Array(10) // occupies 10 next slots in memory 2-12
-const snake = 102; // occupies 13 slot in memory
-```
-
-- unsigned integer is  main datatype for compiler to simplify operations all literals must be converted to unsigned integer at precompile time
-- floating point values are not permitted 
-- variable cant be created without an assigned value
-
-### datatypes
-
-- integer  `0`, `1`, `42`. negative integers cannot be inserted directly to computer and must be negated separately so 44 can be mov r1,44 but -55 must be mov r1,55 and neg r1,r1 to achieve -55
-- boolean true false is converted to 1 and 0 at precompile time
-- array is a
-
-### Proposed
-
-```js
-let counter = 0;
-const limit = 10;
-counter = counter + 1;
-```
-
-- `let` declares variable language doesnt support scopes at any kind.
-- `const` converted to `let` at precompile but precompiler before checks if assignement happened and throws an error.
-- `var`  converted to `let` at precompile.
-
-
-- Reading a binding before its declaration is a compile error.
-- Declaring the same name twice  is a compile error.
-- Assignment to a `const` binding is a precompile error.
-
-
-
-## 7. Expressions and operators
-
-### Proposed initial operators
-
-| Precedence | Operators | Meaning |
-| --- | --- | --- |
-| 1 | `()` | Grouping |
-| 2 | `!`, `~`, unary `-`, unary `+` | Unary operations |
-| 3 | `*`, `/`, `%` | Multiplication and division |
-| 4 | `+`, `-` | Addition and subtraction |
-| 5 | `<<`, `>>` | Shifts |
-| 6 | `<`, `<=`, `>`, `>=` | Relational comparison |
-| 7 | `===`, `!==` | Equality comparison |
-| 8 | `&` | Bitwise AND |
-| 9 | `^` | Bitwise XOR |
-| 10 | `|` | Bitwise OR |
-| 11 | `&&` | Logical AND with short-circuiting |
-| 12 | `||` | Logical OR with short-circuiting |
-| 13 | `=`, `+=`, `-=`, `*=`, `/=`, `%=` | Assignment |
-
-### Open
-
-- Whether loose equality (`==`, `!=`) is allowed beacuse everything is same datatype
-- Whether unsigned right shift (`>>>`) is supported.
-- Whether increment/decrement (`++`, `--`) is supported.
-- Whether the conditional expression (`condition ? a : b`) is supported.
-- Division-by-zero behavior.
-- Signed versus unsigned semantics for comparisons and right shifts.
-
-## 8. Control flow
-
-### Proposed
-
-```js
-if (condition) {
-  statement();
-} else {
-  statement();
+```ts
+class CompilerError extends Error {
+  reason: string
+  errorOccured: boolean
 }
 
-while (condition) {
-  statement();
-}
-
-for (let i = 0; i < limit; i += 1) {
-  statement();
-}
+type CompilerResult = string | CompilerError
+type CompilerStep = (source: string) => CompilerResult
 ```
 
-- `if`/`else`, `while`, and C-style `for` are supported.
-- Braces are required for control-flow bodies.
-- `break` and `continue`  not permitted.
-- `do`/, `for`/`of`, `for`/`in`, `switch`  not permitted.
-- `while` permitted
+- A successful step returns its transformed source string.
+- A failed step returns `CompilerError`.
+- `errorOccured` is `true` for a `CompilerError`.
+- Compilation stops immediately after the first returned or thrown error.
+- The application displays the error's `reason` in the output pane.
+- Partial assembly produced before an error is not executable output.
 
-## 9. Functions and calling convention
-
-### Proposed source syntax
-
-```js
-function add(left, right) {
-  return left + right;
-}
-```
-
-- Named function declarations are supported.
-- Functions may accept positional parameters and return one value.
-- A bare `return` returns the language's default/empty value, which remains to be defined.
-- Function expressions, arrow functions, closures,  rest parameters, and default parameters not permited.
-
-- recursion and nested function permitted.
-
-### Target facts
-
-- Symphony provides `call label`, `ret`, `push register`, and `pop register` pseudo-instructions.
-- `sp` is the stack-pointer register.
-- `flags` is reserved for comparisons and control flow.
-- `zr` is the zero register.
-- General registers are `r1` through `r13`.
-
-### Open ABI decisions
-
-- Which registers carry arguments and return values.
-- Which registers are caller-saved and callee-saved.
-- Stack growth direction and alignment.
-- Local-variable and spilled-temporary layout.
-- Recursion support.
-- Entry-point name and program termination behavior.
-
-## 10. Memory model
-
-### Target facts
-
-The target exposes 8-, 16-, and 32-bit loads/stores plus persistent-memory `pload`/`pstore` instructions. Immediate addresses are U16 values.
-
-### Open
-
-- Addressable memory size.
-- Byte order.
-- Alignment requirements.
-- Whether TuringScript exposes raw pointers or typed memory helpers.
-- Static/global allocation range.
-- Stack memory range and maximum stack size.
-- Persistent-memory source API.
-
-## 11. Input, output, keyboard, screen, and timers
-
-### Target facts
-
-Symphony assembly provides instructions for general input/output, keyboard input, screen configuration, time values, and an instruction counter.
-
-### Open source API
-
-The JavaScript-facing API must be defined before these instructions are emitted. Possible shapes include globals, namespaced built-ins, or imported declarations. No old-build built-in names are carried into TuringScript automatically.
-
-Example options, not yet language rules:
-
-```js
-const value = hardware.input();
-hardware.output(value);
-const key = hardware.keyboard();
-```
-
-## 12. Mapping to Symphony assembly
-
-### Confirmed target capabilities
-
-- Register and immediate moves.
-- Arithmetic: addition, subtraction, multiplication, and negation.
-- Bitwise logic: NAND, AND, OR, NOR, XOR, and NOT.
-- Logical and arithmetic shifts.
-- Register/immediate comparison through `flags`.
-- Conditional and unconditional jumps.
-- Main and persistent memory access.
-- Stack operations and function calls.
-
-### Required compiler responsibilities
-
-- Parse source into a syntax tree.
-- Validate supported syntax and binding rules.
-- Resolve names and scopes.
-- Lower high-level control flow into labels, comparisons, and jumps.
-- Select instructions.
-- Allocate registers and spill values when necessary.
-- Apply the agreed calling convention.
-- Emit deterministic assembly text.
-- Preserve source locations for diagnostics.
-
-### Open lowering decisions
-
-- Assembly label naming and escaping.
-- Temporary-register strategy.
-- Constant folding and other optimizations.
-- Whether assembly comments include source lines.
-- Exact lowering for booleans and short-circuit operators.
-- Exact representation of globals, locals, and constants.
-
-## 13. Diagnostics
-
-### Proposed
-
-- Invalid syntax and unsupported JavaScript features are compile errors.
-- Diagnostics include a stable error code, message, line, and column.
-- The compiler must not silently reinterpret unsupported JavaScript.
-- Compilation either returns valid assembly or reports errors; partial assembly output is not executable.
-
-The current string-to-string compiler API cannot carry structured diagnostics. The API will eventually need either a result object or a separate diagnostics channel; the ordered internal steps can remain string transformations where appropriate.
-
-## 14. Compilation pipeline
-
-### Current scaffold
+The two compiler phases always run in this order:
 
 ```text
 source string
-  -> registered precompilers, in order
-  -> registered pipelines, in order
-  -> assembly string
+  -> registered precompilers, in registration order
+  -> registered compiler pipelines, in registration order
+  -> Symphony assembly string or CompilerError
 ```
 
-### Proposed semantic stages
+## 3. Precompiler boundary
+
+### Confirmed
+
+- A precompiler consumes TuringScript source text and emits TuringScript source text that later precompilers or the core compiler can understand.
+- Precompiler output has the same textual form that could be written in the source editor.
+- A precompiler may add support for a source-level function or construct by expanding it into existing core-language statements.
+- New source conveniences should not require changes to the core compiler when they can be expressed using already-supported core syntax.
+- Precompiler order matters, and every precompiler receives the previous precompiler's output.
+- Generated names and output must be deterministic.
+
+Examples of precompiler responsibilities:
+
+- Normalize whitespace and line endings.
+- Reject semicolons used as ordinary statement terminators. The C-style `for` precompiler consumes the two semicolons that are permitted only inside its header.
+- Validate `const` assignments, then lower `const` to `let`.
+- Lower `var` to `let`.
+- Lower booleans to `0` and `1`.
+- Lower static structs/classes into ordinary variables.
+- Lower array literals into an allocation followed by element assignments.
+- Resolve array sizes and replace `array.length` with the known constant size.
+- Lower `else if` to nested `if` statements and C-style `for` loops to `while` loops.
+- Lower postfix `++` and `--` statements to ordinary assignments.
+- Lower arithmetic compound assignments to ordinary assignments while evaluating their target exactly once.
+- Lower constants larger than U16 into operations on U16 pieces.
+- Constant-fold supported precompiler expressions, including constant `**`, and lower the compiler-recognized `Math` namespace.
+- Expand registered source-level helper functions into core TuringScript code.
+
+The core compiler is therefore only required to understand the canonical subset documented throughout this specification. In particular, it understands `let`; it does not directly implement `const` or `var`.
+
+## 4. Source text, whitespace, and comments
+
+### Confirmed
+
+- Source files are UTF-8 text.
+- LF and CRLF line endings are accepted and normalized to LF.
+- Unneeded whitespace is collapsed by a precompiler for stable compiler input.
+- String literals are prohibited, so whitespace never needs to be preserved as string data.
+- Semicolons are prohibited as ordinary statement terminators.
+- A newline separates simple statements.
+- Multiline expressions are prohibited.
+- Precompiler output places each canonical simple statement on its own line.
+- Single-line comments may start with `//` or `#`. A `#` begins a comment wherever it is encountered outside another comment; preceding whitespace is not required.
+- Block comments use `/* ... */`.
+- Comments are preserved through precompilation.
+- If one commented source line expands into multiple lines, its comment is attached to the first generated line only.
+
+Example:
+
+```js
+let value = helper() // initial value
+```
+
+If `helper()` expands to four lines, the result is conceptually:
 
 ```text
-source text
-  -> normalization
-  -> tokenization
-  -> parsing
-  -> syntax tree
-  -> semantic validation and symbol resolution
-  -> intermediate representation
-  -> control-flow lowering
-  -> instruction selection
-  -> register allocation
-  -> assembly formatting
+generated line 1 // initial value
+generated line 2
+generated line 3
+generated line 4
 ```
 
-Whether each semantic stage remains a string-to-string pipeline is open. Syntax trees and intermediate representations are safer as typed internal data even if the public `compile(source: string): string` API remains unchanged.
+Whitespace normalization must distinguish code from comments. It must not modify the text inside a preserved comment.
 
-## 15. Compatibility and versioning
+## 5. Identifiers and program structure
 
-### Proposed
+### Confirmed
 
-- The language starts at specification version `0.1`.
-- Backward-incompatible language changes increment the minor version while the language is pre-1.0.
-- Compiler output may change between versions while preserving specified program behavior.
-- The Monaco language ID remains `turingScript` and is independent of the spec version.
+- Identifiers are initially restricted to `[A-Za-z_$][A-Za-z0-9_$]*`.
+- Identifiers are case-sensitive.
+- Identifiers beginning with `__ts_` are reserved for deterministic compiler-generated names and are prohibited in user source.
+- Reserved TuringScript keywords cannot be used as identifiers.
+- Braces are required for control-flow and function bodies.
+- TuringScript has one program-wide variable scope.
+- The developer is responsible for avoiding unintended interactions between program-wide variables used by different functions.
 
-## 16. Decisions required before implementation
+The working lexical, source, constant-expression, and lean canonical grammars are maintained in `docs/turing-script-grammar.md`. Function and struct productions remain explicitly paused there.
 
-1. Is TuringScript a small JavaScript-compatible subset, or is full ECMAScript compatibility a long-term goal?
-2. What is the exact integer width, signedness, and overflow behavior?
-3. Which value types are required in version 0.1?
-4. Are semicolons required?
-5. Which declarations are supported: `let`, `const`, and/or `var`?
-6. Which expression operators are required initially?
-7. Which control-flow statements are required initially?
-8. Are functions required in version 0.1, and can they recurse?
-9. What calling convention should functions use?
-10. What source-level API maps to hardware I/O and persistent memory?
-11. How are globals, locals, arrays, and strings represented in memory?
-12. Should compiler diagnostics change the public string-to-string API?
-13. Should the two current example precompilers remain, become token-aware, or be removed?
+## 6. Numeric model and literals
 
-## 17. Conformance examples
+### Confirmed
 
-Normative conformance examples will be added only after the open semantic decisions above are confirmed. Each example should contain:
+- Registers, variables, array elements, struct fields, and intermediate values are 32-bit words.
+- The machine does not store datatype or signedness metadata.
+- The default interpretation of every value is an unsigned 32-bit integer.
+- Signed interpretation is requested by explicit signed operators only.
+- The compiler does not track signed or unsigned variable types.
+- `/` and `%` interpret their operands as unsigned values. Addition, subtraction, multiplication, and bitwise operations need no separate signed form because their 32-bit result bits are the same.
+- The compiler does not diagnose, prevent, or compensate for arithmetic overflow. The hardware result is accepted.
+- Precompiler constant evaluation does not add overflow correction or automatic intermediate truncation. The programmer is responsible for keeping compile-time calculations within the intended U32 range; behavior outside that range is not guaranteed and no overflow diagnostic is promised.
+- Floating-point, bigint, `NaN`, and infinity values are prohibited.
+- Decimal, hexadecimal, and binary integer literals are accepted.
+- Every literal must fit within an unsigned 32-bit word after preprocessing.
+- `true` is lowered to `1`, and `false` is lowered to `0`.
+- `null` and `undefined` are allowed source literals and are lowered to `0` by a precompiler.
+- A negative source value is lowered to a positive value followed by negation because it cannot be moved directly as a negative immediate.
+- Octal literals, numeric separators, and exponential notation are prohibited.
+- Runtime exponentiation is prohibited. A constant exponent expression such as `2 ** 31` is allowed only when a precompiler can fully evaluate and replace it with a U32 value.
+
+Examples:
+
+```js
+let decimal = 42
+let hexadecimal = 0xff
+let binary = 0b1010
+let negative = -55
+let enabled = true
+```
+
+### Large constants
+
+Symphony immediate operands are U16 values in the range `0` through `65535`. A precompiler detects larger U32 literals and lowers each one into a multistage construction using its high and low 16-bit pieces.
+
+The conceptual assembly operation is:
+
+```text
+mov result, high16
+lsl result, result, 16
+or result, result, low16
+```
+
+The precompiler emits equivalent core TuringScript statements rather than making large literals a special case in the final compiler. Generated temporary names must be deterministic and collision-safe.
+
+## 7. Variables and memory allocation
+
+### Confirmed
+
+- A canonical variable declaration uses `let` and requires an initializer.
+- Reading a variable before its declaration is a compile error.
+- “Before declaration” is determined by canonical source order; the compiler does not perform definite-initialization analysis across branches.
+- Declaring the same name more than once is a compile error because there is only one scope.
+- `const` is accepted source syntax. A precompiler rejects reassignment and then lowers it to `let`.
+- `var` is accepted source syntax and is lowered to `let`.
+- Every scalar variable occupies one 32-bit word in compiler-managed RAM.
+- Declarations are allowed at top level and inside control-flow or function bodies. Their storage is reserved statically, while their initializer executes whenever control reaches the declaration. Coordinating the resulting program-wide variables is the programmer's responsibility.
+- If control never reaches a declaration, its reserved RAM remains at its hardware-initialized zero value. Reading that storage through another valid path is the programmer's responsibility.
+- `var` receives no JavaScript hoisting behavior; after precompilation it behaves exactly like the corresponding `let` declaration at the same source position.
+- Variables and array elements receive sequential memory addresses and are never automatically reclaimed.
+- RAM is byte-addressed. One byte contains 8 bits, so every 32-bit scalar occupies four consecutive byte addresses.
+- Consecutive scalar variables begin at addresses `0`, `4`, `8`, and so on.
+- Direct source use of `load_8`, `load_16`, `load_32`, `store_8`, `store_16`, and `store_32` is prohibited.
+- Compiler-managed variables and arrays use `pload` and `pstore` as 32-bit main RAM operations, despite their persistent-memory names in the target instruction set.
+- Internal expansion of `call`, `ret`, `push`, and `pop` may use `load_32` and `store_32`; this does not make those instructions available directly in TuringScript source.
+- Immediate addresses are limited to U16, but register-addressed `pload` and `pstore` can use addresses constructed in registers.
+- The compiler does not check whether total allocation exceeds physical RAM. Available RAM is treated as practically unlimited, and exceeding it is the programmer's responsibility.
+
+Example allocation:
+
+```js
+let counter = 0        // bytes 0 through 3
+const limit = 10       // bytes 4 through 7
+let values = Array(10) // elements at bytes 8 through 47
+const snake = 102      // bytes 48 through 51
+```
+
+## 8. Static arrays
+
+### Confirmed
+
+- Arrays are allowed.
+- An array has a fixed size and cannot be resized.
+- An array identifier is a compile-time symbol containing the fixed byte address of its first element and its fixed length.
+- The array identifier does not occupy a runtime pointer slot.
+- Only the array elements consume RAM, alongside scalar variables in sequential addresses.
+- An array element occupies one 32-bit word.
+- `Array(size)` allocates an array with the specified size.
+- Array elements may be read or assigned using any valid one-line scalar expression as the index.
+- A dynamic element address is calculated at runtime as `compileTimeBaseAddress + runtimeIndex * 4`.
+- Array length is compile-time metadata; it does not consume a second runtime slot.
+
+```js
+let values = Array(10)
+values[2] = 99
+let index = 3
+let selected = values[index]
+```
+
+- Array literals are source-level convenience syntax lowered by a precompiler.
+- A sparse array literal is allowed. Every omitted element is lowered to `0`.
+- Array literal elements may be any otherwise-valid one-line runtime expression.
+- Array literal elements are evaluated from left to right when execution reaches the declaration, not during precompilation unless an element is independently constant-foldable.
+
+```js
+let values = [3, 4, 5]
+```
+
+lowers to:
+
+```js
+let values = Array(3)
+values[0] = 3
+values[1] = 4
+values[2] = 5
+```
+
+For example, `[1, , 3]` lowers in the same way but assigns `0` to element `1`.
+
+Runtime expressions are preserved as generated element assignments:
+
+```js
+let values = [speed + 1, hp * 2, currentScore]
+```
+
+lowers to:
+
+```js
+let values = Array(3)
+values[0] = speed + 1
+values[1] = hp * 2
+values[2] = currentScore
+```
+
+### Confirmed array behavior
+
+- `Array(size)` requires a size that the precompiler can resolve to a constant unsigned integer before runtime.
+- The size may be an integer literal, a constant expression, or a previously declared `const` whose value is resolvable during precompilation.
+- Runtime-dependent sizes are prohibited and produce a precompiler error.
+- `Array(0)` is prohibited and produces a precompiler error.
+- Every cell created by `Array(size)` starts at `0` because RAM initializes to zero.
+- An empty array literal `[]` is prohibited because zero-length arrays are prohibited.
+- A single trailing comma after the final array element is ignored, so `[1, 2,]` has length `2`.
+- A constant index known to be outside the array is a precompiler error.
+- A variable index has no generated runtime bounds check. Staying within bounds is the programmer's responsibility.
+- An array declaration cannot be reassigned, whether it was written with `let` or `const`.
+- Array elements remain mutable, including elements of a `const` array.
+- Array reassignment and `const` checks happen entirely during precompilation.
+- An array identifier may appear only as the base of an indexing expression or in `.length`.
+- Arrays cannot be assigned as values, compared, returned, or passed as arguments.
+- Aliasing such as `let second = first` is prohibited when `first` is an array.
+- Nested arrays are prohibited.
+- `array.length` is replaced with the known constant size by a precompiler.
+- Total RAM allocation is not checked against a fixed maximum.
+- Array storage is reserved statically even when its declaration appears inside a control-flow body or function. Reaching the declaration controls execution of its generated element initializers, not allocation of its addresses.
+- Reaching the same `Array(size)` declaration more than once has implementation-defined clearing behavior. Programs must not depend on whether its existing elements are preserved or reset.
+- Arithmetic compound assignment and postfix increment/decrement may target an array element, for example `values[i] += 2` and `values[i]++`.
+
+```js
+Array(10) // valid
+Array(5 * 2) // valid after constant evaluation
+
+const size = 10
+Array(size) // valid after resolving size
+
+Array(0) // precompiler error: zero-sized array
+Array(keyboard()) // precompiler error: runtime-dependent size
+```
+
+## 9. Static structs declared with `class`
+
+### Confirmed direction
+
+- Classes are allowed only as syntax for static structs.
+- Static structs cannot contain functions or methods.
+- Static structs must be completely removed by a precompiler so the core compiler does not implement them.
+- Compilation and generated names must remain deterministic.
+
+### Paused
+
+The exact declaration syntax, construction syntax, permitted fields, memory representation, field-access lowering, and flattened-name scheme will be redesigned after the non-struct language is settled. The following earlier example is non-normative and must not be implemented yet:
+
+```js
+class Snake() {
+  speed, color, position_x
+}
+
+let x = Snake(1, 0b0101, 33)
+let g = Snake(6, 0b0101, 93)
+x.speed = 99
+g.position_x = 3
+```
+
+Conceptually lowers to:
+
+```js
+let x_speed_aaaaaa = 1
+let x_color_aaaaaa = 0b0101
+let x_position_x_aaaaaa = 33
+
+let g_speed_bbbbbb = 6
+let g_color_bbbbbb = 0b0101
+let g_position_x_bbbbbb = 93
+
+x_speed_aaaaaa = 99
+g_position_x_bbbbbb = 3
+```
+
+The class syntax above is a possible TuringScript extension and is not claimed to be valid ECMAScript class syntax.
+
+## 10. Expressions and operators
+
+### Confirmed operators
+
+Listed from highest to lowest precedence:
+
+| Operators | Meaning |
+| --- | --- |
+| `()` | Grouping |
+| `!`, `~`, unary `-` | Unary operations |
+| `*`, `/`, `%` | Multiplication, division, modulo |
+| `+`, `-` | Addition and subtraction |
+| `<<`, `>>`, `s>>` | Left shift, unsigned right shift, signed right shift |
+| `<`, `<=`, `>`, `>=`, `s<`, `s<=`, `s>`, `s>=` | Unsigned and signed relational comparisons |
+| `==`, `!=`, `===`, `!==` | Equality and inequality |
+| `&` | Bitwise AND |
+| `^` | Bitwise XOR |
+| `|` | Bitwise OR |
+| `&&` | Logical AND with short-circuiting |
+| `||` | Logical OR with short-circuiting |
+| `=`, `+=`, `-=`, `*=`, `/=`, `%=` | Assignment |
+
+The signed operators must be written as contiguous tokens.
+
+- Operands are evaluated from left to right.
+- Every operand and assignment target expression is evaluated exactly once. Precompiler lowering must not duplicate side effects; for example, the index in `values[keyboard()]++` is read once.
+- Binary operators of the same precedence associate from left to right.
+- Parentheses may be used to group mathematical and other expressions and override the normal precedence.
+- Chained assignment such as `a = b = 1` is prohibited.
+- Assignment is a statement operation and does not produce a value. Assignments nested inside declarations, conditions, or other expressions are prohibited.
+- Unary `+` is prohibited because TuringScript has no datatype conversion.
+- Bitwise and shift compound assignments `&=`, `|=`, `^=`, `<<=`, `>>=`, and `s>>=` are unsupported.
+- Postfix `value++` and `value--` are supported as statements and are lowered by a precompiler to `value = value + 1` and `value = value - 1`.
+- Logical NOT `!value` produces `1` when `value` is zero and `0` otherwise.
+- The special `Math` namespace described below provides compiler-recognized precompiler helpers. It is not an object or runtime module.
+
+| TuringScript | Target behavior |
+| --- | --- |
+| `a >> b` | `lsr`: unsigned/logical right shift |
+| `a s>> b` | `asr`: signed/arithmetic right shift |
+| `a < b` | `cmp` followed by unsigned `jb` behavior |
+| `a <= b` | `cmp` followed by unsigned `jbe` behavior |
+| `a > b` | `cmp` followed by unsigned `ja` behavior |
+| `a >= b` | `cmp` followed by unsigned `jae` behavior |
+| `a s< b` | `cmp` followed by signed `jl` behavior |
+| `a s<= b` | `cmp` followed by signed `jle` behavior |
+| `a s> b` | `cmp` followed by signed `jg` behavior |
+| `a s>= b` | `cmp` followed by signed `jge` behavior |
+
+Loose and strict equality are both supported and have identical behavior because TuringScript has one machine-word datatype. Equality does not need signed variants because signedness does not change whether two bit patterns are equal.
+
+Division by zero produces `0`. Modulo `A` by zero produces `A`. These are target-machine behaviors and do not produce compiler errors.
+
+### Comparison results
+
+`cmp left, right` writes three independent Boolean results into `flags`:
+
+- Bit 0: `left === right`.
+- Bit 1: `left < right` using unsigned interpretation.
+- Bit 2: `left s< right` using signed interpretation.
+
+Comparison expressions may be assigned to variables and always produce exactly `0` or `1`. The compiler extracts and combines the flag bits directly:
+
+| Expression | Boolean value derived from `flags` |
+| --- | --- |
+| `a == b` or `a === b` | bit 0 |
+| `a != b` or `a !== b` | bit 0 XOR `1` |
+| `a < b` | bit 1 |
+| `a <= b` | bit 0 OR bit 1 |
+| `a > b` | (bit 0 OR bit 1) XOR `1` |
+| `a >= b` | bit 1 XOR `1` |
+| `a s< b` | bit 2 |
+| `a s<= b` | bit 0 OR bit 2 |
+| `a s> b` | (bit 0 OR bit 2) XOR `1` |
+| `a s>= b` | bit 2 XOR `1` |
+
+When a comparison is used directly as a condition, the compiler may use the matching conditional jump without first storing its Boolean value.
+
+### Conditional Boolean operators
+
+- `&&` and `||` are defined for Boolean condition operations.
+- They are supported inside `if`, `while`, and `for` conditions.
+- Comparison expressions, `true`, `false`, and values intended by the programmer to contain `0` or `1` may be their operands.
+- The compiler does not track Boolean types and does not validate whether an operand is Boolean.
+- Using `&&` or `||` with non-Boolean values is undefined behavior and is the programmer's responsibility.
+- Using `&&` or `||` outside a control-flow condition is undefined behavior.
+- Within conditions they use short-circuit control flow: `a && b` evaluates `b` only when `a` is true; `a || b` evaluates `b` only when `a` is false.
+
+For example, this is valid:
+
+```js
+if ((5 > speed && hp > 0) || isGolden == true) {
+  action()
+}
+```
+
+`&&` binds more tightly than `||`, matching the operator table, so the outer parentheses above are optional.
+
+### Shift behavior
+
+- Shift counts use only their lowest five bits and therefore wrap modulo 32.
+- `value >> 32` is equivalent to `value >> 0`.
+- `value >> 55` is equivalent to `value >> 23`.
+- `<<` and `>>` fill newly introduced bits with `0`.
+- `s>>` is the signed arithmetic-right-shift operation and fills newly introduced high bits with the original sign bit.
+- Shifted-out bits are discarded.
+- The compiler does not emit range checks or special handling for shift counts.
+
+### Open operator decisions
+
+None currently.
+
+Prefix `++value`, prefix `--value`, and the conditional expression `condition ? a : b` are prohibited. The JavaScript unsigned-right-shift token `>>>` is not needed because TuringScript defines `>>` as unsigned, so it is unsupported.
+
+### Confirmed precompiler `Math` namespace
+
+`Math` is reserved syntax recognized and completely removed by a precompiler. It does not create an object, permit general property access, or exist at runtime.
+
+The supported members are:
+
+```js
+let smaller = Math.min(a, b)       // unsigned comparison
+let larger = Math.max(a, b)        // unsigned comparison
+let signedSmaller = Math.smin(a, b) // signed comparison
+let signedLarger = Math.smax(a, b)  // signed comparison
+let magnitude = Math.abs(value)     // signed interpretation
+
+let unsignedMinimum = Math.U32_MIN // 0
+let unsignedMaximum = Math.U32_MAX // 0xffffffff
+let signedMinimum = Math.S32_MIN   // 0x80000000
+let signedMaximum = Math.S32_MAX   // 0x7fffffff
+```
+
+- `min`, `max`, `smin`, and `smax` require exactly two arguments.
+- `abs` requires exactly one argument.
+- Arguments may be runtime expressions. Each argument is evaluated exactly once, from left to right.
+- `Math.abs(Math.S32_MIN)` produces the unchanged bit pattern `0x80000000`; no overflow error or special correction is generated.
+- Any other `Math` property or call is prohibited unless registered by a later precompiler extension.
+- The precompiler lowers every member into existing core statements and expressions.
+
+## 11. Control flow
+
+### Confirmed
+
+- `if`/`else`, `while`, and C-style `for` are supported.
+- `else if` is supported and is lowered by a precompiler to a nested `if` in the `else` body.
+- C-style `for` is lowered by a precompiler to a `while` loop.
+- A `continue` originating inside a lowered C-style `for` executes the update clause before testing the condition again.
+- Braces are required for their bodies.
+- A condition is false when its value is `0` and true when it is nonzero.
+- `break` and `continue` are supported and apply to the nearest enclosing loop.
+- Empty C-style `for` clauses, including `for (;;)`, are prohibited.
+- The two separators in a C-style `for` header are semicolons. This is the only source context in which semicolons are allowed.
+- A specialized `for (let identifier in array)` loop is allowed. It declares its program-wide index variable and assigns successive indexes from `0` through `array.length - 1`.
+- `for (let identifier in array)` is lowered by a precompiler to a `while` loop.
+- `do`/`while`, `for`/`of`, `switch`, and labeled statements are prohibited.
+
+```js
+if (condition) {
+  action()
+} else {
+  fallback()
+}
+
+while (condition) {
+  action()
+}
+
+```
+
+```js
+for (let i = 0; i < limit; i++) {
+  action()
+}
+
+for (let index in values) {
+  output(values[index])
+}
+```
+
+Ordinary semicolon statement terminators and the comma operator remain prohibited.
+
+The C-style `for` initializer must be either one `let` declaration or one ordinary assignment. Its condition may be any valid condition expression. Its update must be one ordinary assignment, arithmetic compound assignment, or postfix increment/decrement. All three clauses are required.
+
+Standalone block statements are prohibited because blocks do not create scope. Blocks appear only where required as bodies of control-flow constructs or, once resumed, functions.
+
+## 12. Unsupported and precompiler-only JavaScript syntax
+
+### Confirmed
+
+- `null` and `undefined` are the only null-like source values; both lower to `0`.
+- Object literals, `new`, destructuring declarations or assignments, spread syntax, optional chaining, and nullish coalescing are prohibited.
+- The comma operator is prohibited. This does not settle the separate question of delimiters inside a C-style `for` header.
+- `typeof`, `delete`, `void`, and `instanceof` are prohibited.
+- The binary `in` operator is prohibited. The dedicated `for (let identifier in array)` syntax is a separate loop construct.
+- `this`, `super`, and the implicit `arguments` object are prohibited.
+- `with`, `debugger`, `yield`, and `await` are prohibited.
+- Property access is prohibited except for `array.length` and the future static-struct syntax, which remains paused.
+- Numeric separators, octal literals, and exponential notation are prohibited.
+- Multiple declarations such as `let a = 1, b = 2` are prohibited.
+- Logical assignments `&&=`, `||=`, and `??=`, exponent assignment `**=`, and unsigned-shift assignment `>>>=` are unsupported.
+- Ordinary user-defined function calls within expressions are prohibited while function semantics are paused.
+- Constant `**` and the special `Math` namespace are precompiler facilities, not runtime operator or module support.
+
+## 13. Functions and calling convention
+
+### Confirmed
+
+- Named function declarations are intended to be supported.
+- A function may call another function.
+- All source variables remain in one program-wide scope; the developer is responsible for coordinating variables used by different functions.
+- Function expressions, arrow functions, closures, rest parameters, and default parameters are prohibited.
+
+### Informative assembly example
+
+`docs/examples/functions.txt` demonstrates one existing Symphony convention:
+
+- `r1` and `r2` carry arguments.
+- `r1` carries the result.
+- A function restores every used register other than its argument/result registers.
+- `push` and `pop` preserve registers.
+- `call` and `ret` maintain return addresses on the stack, allowing one function to call another.
+
+This example is informative, not yet the normative TuringScript ABI.
+
+### Paused
+
+- The normative argument and result registers.
+- Maximum argument count and handling of additional arguments.
+- Caller-saved and callee-saved registers.
+- Local-variable and temporary storage during calls.
+- Recursion support.
+- Nested function declarations.
+- Stack-frame layout and alignment.
+- Entry-point name.
+- Bare `return` behavior.
+- Evaluation order for function arguments.
+
+No function compiler work should begin until these decisions resume.
+
+## 14. Hardware operations
+
+### Confirmed target operations
+
+TuringScript targets the hardware operations defined by `docs/spec`:
+
+- General input: `in`.
+- General output: `out`.
+- Keyboard input: `keyboard`.
+- Screen configuration/output: `screen`.
+- Low and high timer words: `time_0` and `time_1`.
+- Instruction counter: `counter`.
+
+The operand and result behavior is defined by the corresponding Symphony instruction signatures. These operations are compiler-recognized hardware access, not ordinary user-defined runtime functions.
+
+### Confirmed source syntax
+
+```text
+input()                  -> value
+output(value)            -> statement with no value
+keyboard()               -> value
+screen(setting, value)   -> statement with no value
+time_0()                 -> value
+time_1()                 -> value
+counter()                -> value
+```
+
+The source uses `input()` and `output()` instead of the assembly names `in` and `out`, because `in` is already a language token. Examples are maintained in `docs/examples/examples.txt`.
+
+### Hardware calls in expressions
+
+Confirmed value-producing hardware operations may appear inside otherwise-valid expressions, including declarations, assignments, conditions, and arguments to other hardware operations:
+
+```js
+let next = keyboard() + 1
+
+if (keyboard() != 0) {
+  action()
+}
+
+screen(setting, keyboard())
+```
+
+A precompiler lowers nested hardware reads into deterministic generated temporaries. The transformation must preserve left-to-right evaluation and short-circuit behavior. In particular, a hardware read in the right operand of `&&` or `||` must remain inside the conditional path where that operand would have been evaluated; it must not be hoisted unconditionally.
+
+## 15. Mapping to Symphony assembly
+
+### Confirmed
+
+The core compiler is responsible for:
+
+- Parsing canonical precompiler output.
+- Tracking declared variables and sequential RAM slots.
+- Rejecting reads before declaration and duplicate declarations.
+- Compiling canonical expressions.
+- Lowering canonical control flow into deterministic labels, comparisons, and jumps.
+- Selecting Symphony instructions.
+- Allocating temporary registers and spilling values when required.
+- Emitting deterministic assembly text.
+- Preserving source comments on the first emitted line associated with a source statement.
+
+Precompilers are responsible for source conveniences that can be represented in the core language, including `const`, `var`, booleans, static structs, array literals and lengths, array validation, large constants, `else if`, `for`, postfix increment/decrement, constant helpers, and registered helper expansions.
+
+`pload` and `pstore` are compiler-emitted assembly instructions, not TuringScript source operations. Source programs access compiler-managed RAM through variables and arrays.
+
+Source labels, `goto`, inline assembly, raw Symphony instructions, and other low-level escape hatches are prohibited.
+
+The compiler appends no halt instruction or terminal loop. Ending execution safely is the programmer's responsibility. A program that must stop progressing can explicitly end in a suitable loop.
+
+### Open lowering details
+
+- Exact assembly label naming and escaping.
+- Temporary-register allocation and spilling strategy.
+- Constant folding and optional optimizations.
+- Exact canonical representation of generated temporaries.
+- Source-location preservation beyond attached source comments.
+
+## 16. Diagnostics
+
+### Confirmed
+
+- Invalid syntax and unsupported features return `CompilerError`.
+- `CompilerError.reason` contains the user-facing explanation.
+- `CompilerError.errorOccured` is `true`.
+- The first compiler error stops the remaining compilation steps.
+- The compiler currently does not promise a separate error code, line, or column field.
+
+## 17. Canonical precompiler output
+
+### Confirmed
+
+Precompiler output remains textual TuringScript. It is not a separate binary format, syntax tree, or hidden object representation.
+
+The output must use only features understood by the next registered step. The final precompiler must emit only the core subset understood by the assembly compiler. At minimum, this means:
+
+- Declarations use `let`, never `const` or `var`.
+- Boolean values have become `0` or `1`.
+- Static classes and instances have been flattened into scalar variables.
+- Array literals have become `Array(size)` plus indexed assignments.
+- Array sizes have been resolved, array rules have been validated, and `.length` has become a constant.
+- `else if` has become nested `if`.
+- C-style `for` and `for (let identifier in array)` have become `while` loops.
+- Postfix increment/decrement has become ordinary assignment.
+- Arithmetic compound assignment has become ordinary assignment.
+- Large U32 literals have become operations using U16 pieces.
+- Registered helper functions have been expanded into existing core statements.
+- Nested value-producing hardware calls have been extracted into generated temporaries without changing evaluation or short-circuit order.
+- Simple statements are emitted one per line without semicolons.
+- Comments remain attached to the first generated line for their source statement.
+
+A precompiler may itself tokenize or parse source internally. Its public boundary remains `string -> string | CompilerError`.
+
+## 18. Remaining decisions before implementation
+
+### Open now
+
+No non-function, non-struct language decisions are currently open. Implementation-defined array redeclaration behavior remains the programmer's responsibility.
+
+### Paused
+
+All static-struct representation decisions listed in section 9 and all function ABI, recursion, nested-function, stack-frame, entry-point, and bare-return decisions listed in section 13.
+
+## 19. Conformance examples
+
+Each implemented feature must eventually have examples containing:
 
 - TuringScript source.
-- Expected result or diagnostic.
-- Expected Symphony assembly when exact output is normative.
-- Notes describing observable behavior when multiple assembly outputs are valid.
-
+- Precompiler output where lowering is involved.
+- Expected assembly or required observable behavior.
+- Expected `CompilerError.reason` for invalid input.
