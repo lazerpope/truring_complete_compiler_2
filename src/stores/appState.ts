@@ -1,5 +1,6 @@
 import { ref, watch } from 'vue'
 import { defineStore } from 'pinia'
+import { compile as compileSource } from '../compiler/main'
 
 const AUTOCOMPILE_STORAGE_KEY = 'autocompile'
 const TEXT_STORAGE_KEY = 'text'
@@ -37,7 +38,7 @@ export const useAppState = defineStore('app-state', () => {
   const compiled = ref('')
 
   const compile = () => {
-    compiled.value = `${text.value}compiled`
+    compiled.value = compileSource(text.value)
   }
 
   if (autocompile.value && text.value) compile()

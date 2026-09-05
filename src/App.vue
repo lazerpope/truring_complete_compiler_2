@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
-import Editor from './Editor.vue'
+import { computed, ref, toRef } from 'vue'
+import { initMonaco } from './monaco/initMonaco'
 import { useAppState } from './stores/appState'
 
 const store = useAppState()
+const editorHost = initMonaco(toRef(store, 'text'))
 const fileInput = ref<HTMLInputElement | null>(null)
 const editorStatus = ref(store.text ? 'Restored' : 'Idle')
 const resultStatus = ref(store.compiled ? 'Compiled' : 'Waiting')
@@ -114,7 +115,7 @@ const compile = () => {
           <span>{{ editorStatus }}</span>
         </header>
         <div class="code-wrap code-wrap--single">
-          <Editor />
+          <div ref="editorHost" class="monaco-host" />
         </div>
       </section>
 
@@ -321,6 +322,12 @@ button.primary {
 
 .code-wrap--single {
   grid-template-columns: minmax(0, 1fr);
+}
+
+.monaco-host {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
 }
 
 .text-gutter {
