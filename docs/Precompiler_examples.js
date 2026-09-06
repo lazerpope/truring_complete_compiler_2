@@ -1,6 +1,15 @@
 # TuringScript precompiler review corpus
-# Each numbered section is independent and maps one-to-one to the ordered stages
-# in docs/precompiler-spec.md. The complete file is not intended to compile.
+# Each section maps one-to-one to the ordered stages in docs/precompiler-spec.md.
+# Only accepted source is included; deliberately failing validation cases belong in tests.
+
+let left = 1
+let right = 2
+let runtimeValue = 3
+let value = 4
+let counterValue = 0
+let firstCondition = 0
+let secondCondition = 1
+let updatedValues = Array(4)
 
 // normalizeLineEndings ------------------------------------------------------
 # Run these lines once with CRLF and once with CR-only endings.
@@ -12,19 +21,16 @@ let     spacedValue     =     1    +    2
 let commentedValue = 3 // this comment keeps   all of its whitespace
 
 // validateSemicolons --------------------------------------------------------
-let invalidTerminator = 1;
-for (let validSeparator = 0; validSeparator < 3; validSeparator++) {
-  output(validSeparator)
+for (let semicolonIndex = 0; semicolonIndex < 3; semicolonIndex++) {
+  output(semicolonIndex)
 }
 
 // validateIdentifiers -------------------------------------------------------
 let valid_name$1 = 1
-let __ts_invalidReservedPrefix = 2
-let while = 3
 
 // validateUnsupportedSyntax -------------------------------------------------
-let invalidObject = { value: 1 }
-goto invalidLabel
+# Unsupported syntax is intentionally absent from this successful corpus.
+let supportedSyntax = valid_name$1 + 1
 
 // collapseEquality ----------------------------------------------------------
 let strictEqual = left === right
@@ -40,11 +46,7 @@ let undefinedValue = undefined
 
 // validateConstAssignments -------------------------------------------------
 const fixedValue = 10
-fixedValue = 11
-
-// foldConstantExpressions --------------------------------------------------
-const foldedSize = (5 * 2) + (2 ** 3)
-let foldedValues = Array(foldedSize)
+let copiedFixedValue = fixedValue
 
 // lowerMathConstants --------------------------------------------------------
 let maximumU16 = Math.U16_MAX
@@ -53,18 +55,17 @@ let maximumU32 = Math.U32_MAX
 let minimumS32 = Math.S32_MIN
 let maximumS32 = Math.S32_MAX
 
-// lowerMathCalls ------------------------------------------------------------
-let unsignedMinimum = Math.min(left, right)
-let unsignedMaximum = Math.max(left, right)
-let signedMinimum = Math.smin(left, right)
-let signedMaximum = Math.smax(left, right)
-let magnitude = Math.abs(value)
+// foldConstantExpressions --------------------------------------------------
+let foldedBooleans = true + true
+const foldedBase = 1
+let foldedConstUse = foldedBase + 3
+let partiallyFolded = runtimeValue + 4 * 2
+const foldedSize = (5 * 2) + (2 ** 3)
+let foldedValues = Array(foldedSize)
 
 // validateArrayRules --------------------------------------------------------
 let validArray = Array(10)
-let invalidZeroArray = Array(0)
-let invalidRuntimeArray = Array(keyboard())
-validArray = Array(20)
+validArray[0] = copiedFixedValue
 
 // lowerArrayLiterals --------------------------------------------------------
 let literalValues = [1, runtimeValue + 1, , keyboard(),]
@@ -77,24 +78,22 @@ let lengthExpression = lengthValues.length + 1
 // validateConstantArrayBounds ----------------------------------------------
 let boundedValues = Array(3)
 let validElement = boundedValues[2]
-let invalidElement = boundedValues[3]
-boundedValues[99] = 1
 
 // lowerArrayForLoops --------------------------------------------------------
 let iteratedValues = Array(4)
-for (let index in iteratedValues) {
-  if (iteratedValues[index] == 0) {
+for (let arrayIndex in iteratedValues) {
+  if (iteratedValues[arrayIndex] == 0) {
     continue
   }
-  output(index)
+  output(arrayIndex)
 }
 
 // lowerCStyleForLoops -------------------------------------------------------
-for (let index = 0; index < 10; index++) {
-  if (index == 5) {
+for (let cStyleIndex = 0; cStyleIndex < 10; cStyleIndex++) {
+  if (cStyleIndex == 5) {
     continue
   }
-  output(index)
+  output(cStyleIndex)
 }
 
 // lowerElseIf ---------------------------------------------------------------
@@ -118,6 +117,18 @@ value *= 3
 value /= 4
 value %= 5
 updatedValues[keyboard()] += value
+
+// lowerMathCalls ------------------------------------------------------------
+// 1
+let unsignedMinimum = Math.min(left, right)
+// 2
+let unsignedMaximum = Math.max(left, right)
+// 3
+let signedMinimum = Math.smin(left, right)
+// 4
+let signedMaximum = Math.smax(left, right)
+// 5
+let magnitude = Math.abs(value)
 
 // lowerNestedHardwareReads -------------------------------------------------
 let nestedRead = keyboard() + input() + counter()

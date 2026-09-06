@@ -73,37 +73,37 @@ It does not also lower booleans, rewrite declarations, or format whitespace.
 
 ## 4. Ordered built-in stages
 
-Only stages marked **Implemented** may be registered. Planned files are created when their rule is implemented; identity placeholders must not be registered because they would produce misleading debug snapshots.
+All built-in stages are implemented and registered. Registration order is the order below.
 
 | Order | Stage/file | Status | Single responsibility |
 | ---: | --- | --- | --- |
 | 01 | `normalizeLineEndings.ts` | Implemented | Convert CRLF and CR to LF. |
 | 02 | `removeWhitespaces.ts` | Implemented | Collapse unnecessary code whitespace while preserving blank lines and exact comment contents. |
-| 03 | `validateSemicolons.ts` | Planned | Reject semicolons except the two delimiters in a C-style `for` header. |
-| 04 | `validateIdentifiers.ts` | Planned | Enforce identifier syntax, case rules, reserved names, duplicates, and the reserved `__ts_` prefix. |
-| 05 | `validateUnsupportedSyntax.ts` | Planned | Reject prohibited JavaScript and low-level escape-hatch syntax before another rule can reinterpret it. |
+| 03 | `validateSemicolons.ts` | Implemented | Reject semicolons except the two delimiters in a C-style `for` header. |
+| 04 | `validateIdentifiers.ts` | Implemented | Enforce identifier syntax, case rules, reserved names, duplicates, and the reserved `__ts_` prefix. |
+| 05 | `validateUnsupportedSyntax.ts` | Implemented | Reject prohibited JavaScript and low-level escape-hatch syntax before another rule can reinterpret it. |
 | 06 | `collapseEquality.ts` | Implemented | Convert `===` to `==` and `!==` to `!=` outside comments. |
-| 07 | `lowerBooleanLiterals.ts` | Planned | Convert `true` to `1` and `false` to `0`. |
-| 08 | `lowerNullishLiterals.ts` | Planned | Convert `null` and `undefined` to `0`. |
-| 09 | `validateConstAssignments.ts` | Planned | Record `const` bindings and reject later reassignment while leaving declarations intact for constant evaluation. |
-| 10 | `foldConstantExpressions.ts` | Planned | Evaluate the confirmed constant-expression grammar, including constant `**`, resolved `const` names, division/modulo-zero rules, and constant `Math` calls. |
-| 11 | `lowerMathConstants.ts` | Planned | Replace `Math.U16_MAX`, `Math.S16_MAX`, `Math.U32_MAX`, `Math.S32_MIN`, and `Math.S32_MAX` with their U32 values. |
-| 12 | `lowerMathCalls.ts` | Planned | Expand runtime `Math.min`, `max`, `smin`, `smax`, and `abs` into core statements with once-only left-to-right argument evaluation. |
-| 13 | `validateArrayRules.ts` | Planned | Collect static array metadata and reject zero sizes, runtime sizes, nested arrays, aliasing, reassignment, comparison, passing, and other invalid array use. |
-| 14 | `lowerArrayLiterals.ts` | Planned | Expand array literals into `Array(size)` plus ordered indexed assignments; holes become zero and a trailing comma is ignored. |
-| 15 | `replaceArrayLengths.ts` | Planned | Replace each valid `array.length` with its known constant size. |
-| 16 | `validateConstantArrayBounds.ts` | Planned | Reject every precompiler-known out-of-bounds index; leave runtime indexes unchecked. |
-| 17 | `lowerArrayForLoops.ts` | Planned | Convert `for (let index in array)` to `while`, including correct index increment and `continue` behavior. |
-| 18 | `lowerCStyleForLoops.ts` | Planned | Convert C-style `for` to `while`, moving its update into the body and every applicable `continue` path. |
-| 19 | `lowerElseIf.ts` | Planned | Convert `else if` into an `if` nested in an `else` block. |
-| 20 | `lowerPostfixUpdates.ts` | Planned | Convert statement-form `target++` and `target--` into ordinary assignments while evaluating array indexes once. |
-| 21 | `lowerCompoundAssignments.ts` | Planned | Convert `+=`, `-=`, `*=`, `/=`, and `%=` into ordinary assignments while evaluating targets once. |
-| 22 | `lowerNestedHardwareReads.ts` | Planned | Extract nested value-producing hardware calls into deterministic temporaries without changing left-to-right or short-circuit behavior. |
-| 23 | `lowerLargeConstants.ts` | Planned | Replace U32 expression literals above U16 with high/low U16 construction statements. Allocation-size metadata is not rewritten. |
-| 24 | `lowerConstDeclarations.ts` | Planned | Convert validated `const` declarations to `let`. |
-| 25 | `lowerVarDeclarations.ts` | Planned | Convert `var` declarations to `let` without JavaScript hoisting. |
-| 26 | `validateCanonicalSource.ts` | Planned | Parse the final text against the canonical grammar and report anything that an earlier stage failed to remove. |
-| 27 | `formatCanonicalSource.ts` | Planned | Apply deterministic final formatting without modifying comment contents. |
+| 07 | `lowerBooleanLiterals.ts` | Implemented | Convert `true` to `1` and `false` to `0`. |
+| 08 | `lowerNullishLiterals.ts` | Implemented | Convert `null` and `undefined` to `0`. |
+| 09 | `validateConstAssignments.ts` | Implemented | Record `const` bindings and reject later reassignment while leaving declarations intact for constant evaluation. |
+| 10 | `lowerMathConstants.ts` | Implemented | Replace `Math.U16_MAX`, `Math.S16_MAX`, `Math.U32_MAX`, `Math.S32_MIN`, and `Math.S32_MAX` with their U32 values. |
+| 11 | `foldConstantExpressions.ts` | Implemented | Resolve known `const` names, evaluate required constant expressions, and partially fold literal `+`, `-`, `*`, and `/` subexpressions without treating mutable variables as constants. |
+| 12 | `validateArrayRules.ts` | Implemented | Collect static array metadata and reject zero sizes, runtime sizes, nested arrays, aliasing, reassignment, comparison, passing, and other invalid array use. |
+| 13 | `lowerArrayLiterals.ts` | Implemented | Expand array literals into `Array(size)` plus ordered indexed assignments; holes become zero and a trailing comma is ignored. |
+| 14 | `replaceArrayLengths.ts` | Implemented | Replace each valid `array.length` with its known constant size. |
+| 15 | `validateConstantArrayBounds.ts` | Implemented | Reject every precompiler-known out-of-bounds index; leave runtime indexes unchecked. |
+| 16 | `lowerArrayForLoops.ts` | Implemented | Convert `for (let index in array)` to `while`, including correct index increment and `continue` behavior. |
+| 17 | `lowerCStyleForLoops.ts` | Implemented | Convert C-style `for` to `while`, moving its update into the body and every applicable `continue` path. |
+| 18 | `lowerElseIf.ts` | Implemented | Convert `else if` into an `if` nested in an `else` block. |
+| 19 | `lowerPostfixUpdates.ts` | Implemented | Convert statement-form `target++` and `target--` into ordinary assignments while evaluating array indexes once. |
+| 20 | `lowerCompoundAssignments.ts` | Implemented | Convert `+=`, `-=`, `*=`, `/=`, and `%=` into ordinary assignments while evaluating targets once. |
+| 21 | `lowerMathCalls.ts` | Implemented | Expand runtime `Math.min`, `max`, `smin`, `smax`, and `abs` after loop lowering, with once-only left-to-right and short-circuit-safe evaluation. |
+| 22 | `lowerNestedHardwareReads.ts` | Implemented | Extract nested value-producing hardware calls into deterministic temporaries without changing left-to-right or short-circuit behavior. |
+| 23 | `lowerLargeConstants.ts` | Implemented | Replace U32 expression literals above U16 with high/low U16 construction statements. Allocation-size metadata is not rewritten. |
+| 24 | `lowerConstDeclarations.ts` | Implemented | Convert validated `const` declarations to `let`. |
+| 25 | `lowerVarDeclarations.ts` | Implemented | Convert `var` declarations to `let` without JavaScript hoisting. |
+| 26 | `validateCanonicalSource.ts` | Implemented | Parse the final text against the canonical grammar and report anything that an earlier stage failed to remove. |
+| 27 | `formatCanonicalSource.ts` | Implemented | Apply deterministic final formatting without modifying comment contents. |
 
 Static-struct and function stages are paused and intentionally absent from this order.
 

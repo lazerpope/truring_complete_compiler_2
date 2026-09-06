@@ -1,6 +1,30 @@
 import { doStep as collapseEquality } from './precompiler/collapseEquality'
+import { doStep as foldConstantExpressions } from './precompiler/foldConstantExpressions'
+import { doStep as formatCanonicalSource } from './precompiler/formatCanonicalSource'
+import { doStep as lowerArrayForLoops } from './precompiler/lowerArrayForLoops'
+import { doStep as lowerArrayLiterals } from './precompiler/lowerArrayLiterals'
+import { doStep as lowerBooleanLiterals } from './precompiler/lowerBooleanLiterals'
+import { doStep as lowerCompoundAssignments } from './precompiler/lowerCompoundAssignments'
+import { doStep as lowerConstDeclarations } from './precompiler/lowerConstDeclarations'
+import { doStep as lowerCStyleForLoops } from './precompiler/lowerCStyleForLoops'
+import { doStep as lowerElseIf } from './precompiler/lowerElseIf'
+import { doStep as lowerLargeConstants } from './precompiler/lowerLargeConstants'
+import { doStep as lowerMathCalls } from './precompiler/lowerMathCalls'
+import { doStep as lowerMathConstants } from './precompiler/lowerMathConstants'
+import { doStep as lowerNestedHardwareReads } from './precompiler/lowerNestedHardwareReads'
+import { doStep as lowerNullishLiterals } from './precompiler/lowerNullishLiterals'
+import { doStep as lowerPostfixUpdates } from './precompiler/lowerPostfixUpdates'
+import { doStep as lowerVarDeclarations } from './precompiler/lowerVarDeclarations'
 import { doStep as normalizeLineEndings } from './precompiler/normalizeLineEndings'
+import { doStep as replaceArrayLengths } from './precompiler/replaceArrayLengths'
 import { doStep as removeWhitespaces } from './precompiler/removeWhitespaces'
+import { doStep as validateArrayRules } from './precompiler/validateArrayRules'
+import { doStep as validateCanonicalSource } from './precompiler/validateCanonicalSource'
+import { doStep as validateConstantArrayBounds } from './precompiler/validateConstantArrayBounds'
+import { doStep as validateConstAssignments } from './precompiler/validateConstAssignments'
+import { doStep as validateIdentifiers } from './precompiler/validateIdentifiers'
+import { doStep as validateSemicolons } from './precompiler/validateSemicolons'
+import { doStep as validateUnsupportedSyntax } from './precompiler/validateUnsupportedSyntax'
 import { doStep as compileCanonical } from './pipelines/compileCanonical'
 import {
   addPipelineError,
@@ -153,7 +177,31 @@ export const compiler = new Compiler()
 
 compiler.registerPrecompiler('normalizeLineEndings', normalizeLineEndings)
 compiler.registerPrecompiler('removeWhitespaces', removeWhitespaces)
+compiler.registerPrecompiler('validateSemicolons', validateSemicolons)
+compiler.registerPrecompiler('validateIdentifiers', validateIdentifiers)
+compiler.registerPrecompiler('validateUnsupportedSyntax', validateUnsupportedSyntax)
 compiler.registerPrecompiler('collapseEquality', collapseEquality)
+compiler.registerPrecompiler('lowerBooleanLiterals', lowerBooleanLiterals)
+compiler.registerPrecompiler('lowerNullishLiterals', lowerNullishLiterals)
+compiler.registerPrecompiler('validateConstAssignments', validateConstAssignments)
+compiler.registerPrecompiler('lowerMathConstants', lowerMathConstants)
+compiler.registerPrecompiler('foldConstantExpressions', foldConstantExpressions)
+compiler.registerPrecompiler('validateArrayRules', validateArrayRules)
+compiler.registerPrecompiler('lowerArrayLiterals', lowerArrayLiterals)
+compiler.registerPrecompiler('replaceArrayLengths', replaceArrayLengths)
+compiler.registerPrecompiler('validateConstantArrayBounds', validateConstantArrayBounds)
+compiler.registerPrecompiler('lowerArrayForLoops', lowerArrayForLoops)
+compiler.registerPrecompiler('lowerCStyleForLoops', lowerCStyleForLoops)
+compiler.registerPrecompiler('lowerElseIf', lowerElseIf)
+compiler.registerPrecompiler('lowerPostfixUpdates', lowerPostfixUpdates)
+compiler.registerPrecompiler('lowerCompoundAssignments', lowerCompoundAssignments)
+compiler.registerPrecompiler('lowerMathCalls', lowerMathCalls)
+compiler.registerPrecompiler('lowerNestedHardwareReads', lowerNestedHardwareReads)
+compiler.registerPrecompiler('lowerLargeConstants', lowerLargeConstants)
+compiler.registerPrecompiler('lowerConstDeclarations', lowerConstDeclarations)
+compiler.registerPrecompiler('lowerVarDeclarations', lowerVarDeclarations)
+compiler.registerPrecompiler('validateCanonicalSource', validateCanonicalSource)
+compiler.registerPrecompiler('formatCanonicalSource', formatCanonicalSource)
 
 compiler.registerPipeline('compileCanonical', compileCanonical)
 
