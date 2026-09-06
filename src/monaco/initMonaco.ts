@@ -1,5 +1,6 @@
 import { onBeforeUnmount, onMounted, ref, watch, type Ref } from 'vue'
 import * as monaco from 'monaco-editor/editor'
+import 'monaco-editor/editor/contrib/suggest/browser/suggestController'
 import EditorWorker from 'monaco-editor/editor/editor.worker?worker'
 
 const LANGUAGE_ID = 'turingScript'
@@ -175,69 +176,83 @@ export function initMonaco(source: Ref<string>): Ref<HTMLElement | null> {
     const snippetRule = monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet
     const snippets: CompletionTemplate[] = [
       {
-        label: 'let declaration',
+        label: { label: 'let', description: 'declaration' },
+        filterText: 'let',
         kind: monaco.languages.CompletionItemKind.Snippet,
         detail: 'Mutable TuringScript variable',
         insertText: 'let ${1:name} = ${2:0}',
         insertTextRules: snippetRule,
       },
       {
-        label: 'const declaration',
+        label: { label: 'const', description: 'declaration' },
+        filterText: 'const',
         kind: monaco.languages.CompletionItemKind.Snippet,
         detail: 'Precompiler-checked constant',
         insertText: 'const ${1:name} = ${2:0}',
         insertTextRules: snippetRule,
       },
       {
-        label: 'var declaration',
+        label: { label: 'var', description: 'declaration' },
+        filterText: 'var',
         kind: monaco.languages.CompletionItemKind.Snippet,
         detail: 'Declaration lowered to let without hoisting',
         insertText: 'var ${1:name} = ${2:0}',
         insertTextRules: snippetRule,
       },
       {
-        label: 'if block',
+        label: { label: 'if', description: 'block' },
+        filterText: 'if',
         kind: monaco.languages.CompletionItemKind.Snippet,
         insertText: 'if (${1:condition}) {\n\t$0\n}',
         insertTextRules: snippetRule,
       },
       {
-        label: 'if / else block',
+        label: { label: 'if', description: 'if / else block' },
+        filterText: 'if',
         kind: monaco.languages.CompletionItemKind.Snippet,
         insertText: 'if (${1:condition}) {\n\t${2}\n} else {\n\t$0\n}',
         insertTextRules: snippetRule,
       },
       {
-        label: 'while loop',
+        label: { label: 'while', description: 'loop' },
+        filterText: 'while',
         kind: monaco.languages.CompletionItemKind.Snippet,
         insertText: 'while (${1:condition}) {\n\t$0\n}',
         insertTextRules: snippetRule,
       },
       {
-        label: 'C-style for loop',
+        label: { label: 'for', description: 'C-style loop' },
+        filterText: 'for',
         kind: monaco.languages.CompletionItemKind.Snippet,
         insertText: 'for (let ${1:index} = 0; ${1:index} < ${2:limit}; ${1:index}++) {\n\t$0\n}',
         insertTextRules: snippetRule,
       },
       {
-        label: 'array index loop',
+        label: { label: 'for', description: 'array index loop' },
+        filterText: 'for',
         kind: monaco.languages.CompletionItemKind.Snippet,
         insertText: 'for (let ${1:index} in ${2:array}) {\n\t$0\n}',
         insertTextRules: snippetRule,
       },
     ]
 
+    const keywordCompletions: CompletionTemplate[] = [
+      ['else', 'Conditional fallback'],
+      ['in', 'Array-index loop keyword'],
+      ['break', 'Exit the nearest loop'],
+      ['continue', 'Continue the nearest loop'],
+    ].map(([label, detail]) => ({
+      label: label ?? '',
+      kind: monaco.languages.CompletionItemKind.Keyword,
+      detail,
+      insertText: label ?? '',
+    }))
+
     const valueCompletions: CompletionTemplate[] = [
       ...['true', 'false', 'null', 'undefined'].map((label) => ({
         label,
         kind: monaco.languages.CompletionItemKind.Value,
         detail: 'TuringScript source value',
-        insertText: label,
-      })),
-      ...['break', 'continue'].map((label) => ({
-        label,
-        kind: monaco.languages.CompletionItemKind.Keyword,
-        detail: 'Loop control statement',
         insertText: label,
       })),
       {
@@ -324,10 +339,15 @@ export function initMonaco(source: Ref<string>): Ref<HTMLElement | null> {
           ]
         } else {
           const declaredNames = new Set<string>()
-          for (const match of currentModel
-            .getValue()
-            .matchAll(/^\s*(?:let|const|var)\s+([A-Za-z_$][\w$]*)\s*=/gm)) {
-            if (match[1]) declaredNames.add(match[1])
+          const documentText = currentModel.getValue()
+          const declarationPatterns = [
+            /^\s*(?:let|const|var)\s+([A-Za-z_$][\w$]*)\s*=/gm,
+            /\bfor\s*\(\s*let\s+([A-Za-z_$][\w$]*)\s*(?:=|\bin\b)/g,
+          ]
+          for (const pattern of declarationPatterns) {
+            for (const match of documentText.matchAll(pattern)) {
+              if (match[1]) declaredNames.add(match[1])
+            }
           }
           const declaredCompletions: CompletionTemplate[] = [...declaredNames].map((label) => ({
             label,
@@ -337,6 +357,7 @@ export function initMonaco(source: Ref<string>): Ref<HTMLElement | null> {
           }))
           templates = [
             ...snippets,
+            ...keywordCompletions,
             ...valueCompletions,
             ...hardwareCompletions,
             ...mathCompletions,
@@ -369,7 +390,19 @@ export function initMonaco(source: Ref<string>): Ref<HTMLElement | null> {
       padding: { top: 10, bottom: 10 },
       scrollBeyondLastLine: false,
       quickSuggestions: { other: true, comments: false, strings: false },
+      quickSuggestionsDelay: 0,
       suggestOnTriggerCharacters: true,
+      acceptSuggestionOnEnter: 'on',
+      wordBasedSuggestions: 'off',
+      snippetSuggestions: 'top',
+      suggest: {
+        showKeywords: true,
+        showSnippets: true,
+        showVariables: true,
+        showFunctions: true,
+        showConstants: true,
+        showProperties: true,
+      },
       tabCompletion: 'on',
       bracketPairColorization: { enabled: true },
     })
