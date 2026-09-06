@@ -150,7 +150,7 @@ ForInitializer         ::= "let" Identifier "=" SourceExpression
 ForUpdate              ::= AssignmentTarget AssignmentOperator SourceExpression
                          | AssignmentTarget ( "++" | "--" )
 
-ArrayForStatement      ::= "for" "(" "let" Identifier "in" Identifier ")" Block
+ArrayForStatement      ::= "for" "(" [ "let" ] Identifier "in" Identifier ")" Block
 ```
 
 Semantic rules:
@@ -158,8 +158,10 @@ Semantic rules:
 - Braces are mandatory.
 - Every C-style `for` clause is mandatory.
 - A C-style `for` declaration is scalar; it cannot declare an array.
-- `for (let index in values)` requires `values` to be a declared array.
-- The array loop declares `index` in the single program-wide scope and visits `0` through `values.length - 1`.
+- Both array-loop forms require `values` to be a declared array.
+- `for (let index in values)` declares `index` in the single program-wide scope.
+- `for (index in values)` reuses a previously declared scalar `index` and resets it to `0` when the loop is reached.
+- Both forms visit indexes `0` through `values.length - 1`.
 - `else if` associates with the preceding unmatched `if` and is lowered to an `if` nested inside an `else` block.
 - A `continue` in a lowered C-style `for` executes the update before the next condition test.
 - A `continue` in a lowered array loop increments the generated index before the next condition test.

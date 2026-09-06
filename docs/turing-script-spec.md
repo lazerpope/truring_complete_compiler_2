@@ -519,8 +519,9 @@ let maximumS32 = Math.S32_MAX // 0x7fffffff
 - `break` and `continue` are supported and apply to the nearest enclosing loop.
 - Empty C-style `for` clauses, including `for (;;)`, are prohibited.
 - The two separators in a C-style `for` header are semicolons. This is the only source context in which semicolons are allowed.
-- A specialized `for (let identifier in array)` loop is allowed. It declares its program-wide index variable and assigns successive indexes from `0` through `array.length - 1`.
-- `for (let identifier in array)` is lowered by a precompiler to a `while` loop.
+- Specialized `for (let identifier in array)` and `for (identifier in array)` loops are allowed. Both assign successive indexes from `0` through `array.length - 1`.
+- The `let` form declares a program-wide index variable. The bare form reuses a previously declared scalar and resets it to `0` when reached.
+- Both array-loop forms are lowered by a precompiler to `while` loops.
 - `do`/`while`, `for`/`of`, `switch`, and labeled statements are prohibited.
 
 ```js
@@ -544,6 +545,10 @@ for (let i = 0; i < limit; i++) {
 for (let index in values) {
   output(values[index])
 }
+
+for (index in values) {
+  output(values[index])
+}
 ```
 
 Ordinary semicolon statement terminators and the comma operator remain prohibited.
@@ -560,7 +565,7 @@ Standalone block statements are prohibited because blocks do not create scope. B
 - Object literals, `new`, destructuring declarations or assignments, spread syntax, optional chaining, and nullish coalescing are prohibited.
 - The comma operator is prohibited. This does not settle the separate question of delimiters inside a C-style `for` header.
 - `typeof`, `delete`, `void`, and `instanceof` are prohibited.
-- The binary `in` operator is prohibited. The dedicated `for (let identifier in array)` syntax is a separate loop construct.
+- The binary `in` operator is prohibited. The dedicated `for (let identifier in array)` and `for (identifier in array)` syntaxes are separate loop constructs.
 - `this`, `super`, and the implicit `arguments` object are prohibited.
 - `with`, `debugger`, `yield`, and `await` are prohibited.
 - Property access is prohibited except for `array.length` and the future static-struct syntax, which remains paused.
@@ -707,7 +712,7 @@ The output must use only features understood by the next registered step. The fi
 - Array literals have become `Array(size)` plus indexed assignments.
 - Array sizes have been resolved, array rules have been validated, and `.length` has become a constant.
 - `else if` has become nested `if`.
-- C-style `for` and `for (let identifier in array)` have become `while` loops.
+- C-style `for` and both array `for...in` forms have become `while` loops.
 - Postfix increment/decrement has become ordinary assignment.
 - Arithmetic compound assignment has become ordinary assignment.
 - Large U32 literals have become operations using U16 pieces.

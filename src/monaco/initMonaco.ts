@@ -242,6 +242,13 @@ export function initMonaco(source: Ref<string>): MonacoEditorController {
                 insertText: 'for (let ${1:index} in ${2:array}) {\n\t$0\n}',
                 insertTextRules: snippetRule,
             },
+            {
+                label: { label: 'for', description: 'array index loop (reuse variable)' },
+                filterText: 'for',
+                kind: monaco.languages.CompletionItemKind.Snippet,
+                insertText: 'for (${1:index} in ${2:array}) {\n\t$0\n}',
+                insertTextRules: snippetRule,
+            },
         ]
 
         const keywordCompletions: CompletionTemplate[] = [

@@ -388,6 +388,11 @@ for (let index in values) {
   output(index)
 }
 
+let reusedIndex = 0
+for (reusedIndex in values) {
+  output(values[reusedIndex])
+}
+
 for (let index in values) {
   output(values[index])
 }
@@ -681,10 +686,6 @@ for (let values = Array(10); condition; values[0]++) {
 }
 
 for (const index in values) {
-  output(index)
-}
-
-for (index in values) {
   output(index)
 }
 

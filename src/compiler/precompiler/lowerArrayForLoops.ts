@@ -31,7 +31,7 @@ export function doStep(pipeline: PrecompilerPipeline): PrecompilerPipeline {
       for (let index = 0; index < lines.length; index += 1) {
         const [header, comment] = splitTrailingComment(lines[index] ?? '')
         const match = header.match(
-          /^(\s*)for\s*\(\s*let\s+([A-Za-z_$][\w$]*)\s+in\s+([A-Za-z_$][\w$]*)\s*\)\s*\{\s*$/,
+          /^(\s*)for\s*\(\s*(?:(let)\s+)?([A-Za-z_$][\w$]*)\s+in\s+([A-Za-z_$][\w$]*)\s*\)\s*\{\s*$/,
         )
         if (!match) {
           output.push(lines[index] ?? '')
@@ -42,19 +42,21 @@ export function doStep(pipeline: PrecompilerPipeline): PrecompilerPipeline {
           output.push(lines[index] ?? '')
           continue
         }
-        const array = arrays.get(match[3]!)
+        const array = arrays.get(match[4]!)
         if (!array) {
           output.push(lines[index] ?? '')
           continue
         }
         const indent = match[1] ?? ''
-        const iterator = match[2]!
+        const declaresIterator = match[2] === 'let'
+        const iterator = match[3]!
         const update = `${iterator} = ${iterator} + 1`
         const body = injectBeforeCurrentLoopContinues(
           lowerRange(lines.slice(index + 1, end)),
           update,
         )
-        output.push(`${indent}let ${iterator} = 0${comment ? ` ${comment}` : ''}`)
+        const initializer = `${declaresIterator ? 'let ' : ''}${iterator} = 0`
+        output.push(`${indent}${initializer}${comment ? ` ${comment}` : ''}`)
         output.push(`${indent}while (${iterator} < ${array.size}) {`)
         output.push(...body)
         output.push(`${indent}  ${update}`)

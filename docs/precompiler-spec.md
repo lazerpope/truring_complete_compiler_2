@@ -92,7 +92,7 @@ All built-in stages are implemented and registered. Registration order is the or
 | 13 | `lowerArrayLiterals.ts` | Implemented | Expand array literals into `Array(size)` plus ordered indexed assignments; holes become zero and a trailing comma is ignored. |
 | 14 | `replaceArrayLengths.ts` | Implemented | Replace each valid `array.length` with its known constant size. |
 | 15 | `validateConstantArrayBounds.ts` | Implemented | Reject every precompiler-known out-of-bounds index; leave runtime indexes unchecked. |
-| 16 | `lowerArrayForLoops.ts` | Implemented | Convert `for (let index in array)` to `while`, including correct index increment and `continue` behavior. |
+| 16 | `lowerArrayForLoops.ts` | Implemented | Convert declaring `for (let index in array)` and reuse-form `for (index in array)` loops to `while`, including correct index increment and `continue` behavior. |
 | 17 | `lowerCStyleForLoops.ts` | Implemented | Convert C-style `for` to `while`, moving its update into the body and every applicable `continue` path. |
 | 18 | `lowerElseIf.ts` | Implemented | Convert `else if` into an `if` nested in an `else` block. |
 | 19 | `lowerPostfixUpdates.ts` | Implemented | Convert statement-form `target++` and `target--` into ordinary assignments while evaluating array indexes once. |

@@ -88,6 +88,10 @@ for (let arrayIndex in iteratedValues) {
   output(arrayIndex)
 }
 
+for (arrayIndex in iteratedValues) {
+  output(iteratedValues[arrayIndex])
+}
+
 // lowerCStyleForLoops -------------------------------------------------------
 for (let cStyleIndex = 0; cStyleIndex < 10; cStyleIndex++) {
   if (cStyleIndex == 5) {
