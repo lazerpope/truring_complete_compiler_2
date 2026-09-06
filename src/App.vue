@@ -1,13 +1,17 @@
 <script setup lang="ts">
-import { computed, ref, toRef } from 'vue'
+import { computed, ref, toRef, watch } from 'vue'
 import { initMonaco } from './monaco/initMonaco'
 import { useAppState } from './stores/appState'
+import { useUiState } from './stores/uiState'
 
 const store = useAppState()
-const editorHost = initMonaco(toRef(store, 'text'))
+const uiStore = useUiState()
+const { editorHost, zoom: zoomEditor } = initMonaco(toRef(store, 'text'))
 const fileInput = ref<HTMLInputElement | null>(null)
 const editorStatus = ref(store.text ? 'Restored' : 'Idle')
 const resultStatus = ref(store.compiled ? 'Compiled' : 'Waiting')
+
+watch(() => uiStore.editorZoom, zoomEditor, { immediate: true })
 
 const resultLineNumbers = computed(() => {
   const lineCount = store.compiled === '' ? 1 : store.compiled.split('\n').length
@@ -111,8 +115,33 @@ const compile = () => {
     <div class="panes">
       <section class="pane">
         <header class="pane-header">
-          Editor
-          <span>{{ editorStatus }}</span>
+          <span class="pane-title">Editor</span>
+          <div class="pane-header-actions">
+            <div class="editor-zoom-controls" aria-label="Editor zoom controls">
+              <button
+                type="button"
+                class="zoom-button"
+                aria-label="Zoom editor out"
+                title="Zoom out"
+                :disabled="uiStore.editorZoom <= 8"
+                @click="uiStore.zoom('editor', -1)"
+              >
+                −
+              </button>
+              <span class="zoom-value">{{ uiStore.editorZoom }}px</span>
+              <button
+                type="button"
+                class="zoom-button"
+                aria-label="Zoom editor in"
+                title="Zoom in"
+                :disabled="uiStore.editorZoom >= 32"
+                @click="uiStore.zoom('editor', 1)"
+              >
+                +
+              </button>
+            </div>
+            <span class="pane-status">{{ editorStatus }}</span>
+          </div>
         </header>
         <div class="code-wrap code-wrap--single">
           <div ref="editorHost" class="monaco-host" />
@@ -121,12 +150,45 @@ const compile = () => {
 
       <section class="pane">
         <header class="pane-header">
-          Result
-          <span>{{ resultStatus }}</span>
+          <span class="pane-title">Result</span>
+          <div class="pane-header-actions">
+            <div class="editor-zoom-controls" aria-label="Result zoom controls">
+              <button
+                type="button"
+                class="zoom-button"
+                aria-label="Zoom result out"
+                title="Zoom out"
+                :disabled="uiStore.resultZoom <= 8"
+                @click="uiStore.zoom('result', -1)"
+              >
+                −
+              </button>
+              <span class="zoom-value">{{ uiStore.resultZoom }}px</span>
+              <button
+                type="button"
+                class="zoom-button"
+                aria-label="Zoom result in"
+                title="Zoom in"
+                :disabled="uiStore.resultZoom >= 32"
+                @click="uiStore.zoom('result', 1)"
+              >
+                +
+              </button>
+            </div>
+            <span class="pane-status">{{ resultStatus }}</span>
+          </div>
         </header>
         <div class="code-wrap">
           <div class="text-gutter" aria-hidden="true">
-            <div class="text-gutter__inner">{{ resultLineNumbers }}</div>
+            <div
+              class="text-gutter__inner"
+              :style="{
+                fontSize: `${uiStore.resultZoom}px`,
+                lineHeight: `${Math.round(uiStore.resultZoom * 1.5)}px`,
+              }"
+            >
+              {{ resultLineNumbers }}
+            </div>
           </div>
           <textarea
             :value="store.compiled"
@@ -134,6 +196,10 @@ const compile = () => {
             aria-label="Compiled assembly"
             readonly
             spellcheck="false"
+            :style="{
+              fontSize: `${uiStore.resultZoom}px`,
+              lineHeight: `${Math.round(uiStore.resultZoom * 1.5)}px`,
+            }"
           />
         </div>
       </section>
@@ -306,11 +372,87 @@ button.primary {
   text-transform: uppercase;
 }
 
-.pane-header span {
+.pane-title {
+  color: var(--muted);
+}
+
+.pane-header-actions {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.pane-status {
+  max-width: 150px;
   overflow: hidden;
   color: var(--accent);
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.editor-zoom-controls {
+  flex: none;
+  display: inline-grid;
+  grid-template-columns: 26px minmax(42px, auto) 26px;
+  align-items: center;
+  height: 24px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: rgba(26, 28, 34, 0.72);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+.zoom-button {
+  width: 26px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--accent);
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.zoom-button:first-child {
+  border-right: 1px solid var(--border);
+}
+
+.zoom-button:last-child {
+  border-left: 1px solid var(--border);
+}
+
+.zoom-button:hover {
+  border-color: transparent;
+  background: rgba(0, 232, 198, 0.12);
+  box-shadow: none;
+  transform: none;
+}
+
+.zoom-button:active {
+  background: rgba(0, 232, 198, 0.2);
+}
+
+.zoom-button:disabled,
+.zoom-button:disabled:hover {
+  color: var(--muted);
+  background: transparent;
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.zoom-value {
+  padding: 0 6px;
+  color: var(--text);
+  font-size: 10px;
+  letter-spacing: 0;
+  line-height: 22px;
+  text-align: center;
+  text-transform: none;
+  user-select: none;
 }
 
 .code-wrap {
