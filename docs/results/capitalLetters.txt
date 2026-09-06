@@ -1,0 +1,29 @@
+const letter = r1
+const saw_space = r2
+mov saw_space, 1
+label:
+in letter
+mul saw_space,saw_space,32
+sub letter,letter,saw_space
+out letter
+mov saw_space, 0
+cmp letter,32
+jne label
+mov saw_space, 1
+jmp label
+
+
+
+
+
+let letter = 0
+let saw_space = 1
+
+while(true){
+letter = input() - saw_space * 32
+output(letter)
+saw_space = 0
+    if (letter==32){
+        saw_space = 1
+    }
+}

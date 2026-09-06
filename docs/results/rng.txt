@@ -1,0 +1,36 @@
+const seed = r1
+const t1 = r2
+const t2 = r3
+const res = r4
+const x = r5
+
+
+in seed
+loop:
+lsr x,seed,13
+xor t1,seed,x
+
+lsl x,t1,17
+xor t2,t1,x
+
+lsr x,t2,5
+xor res,t2,x
+
+out res
+mov seed,res
+jmp loop
+
+
+let seed = input()
+let t1 = 0
+let t2 = 0
+let res = 0
+
+while(true){
+t1 = seed ^ (seed >> 13)
+t2 = t1 ^ (t1 << 17)
+res = t2 ^ (t2 >> 5)
+seed = res
+output(res)
+}
+

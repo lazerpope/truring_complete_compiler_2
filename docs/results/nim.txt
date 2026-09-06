@@ -1,0 +1,32 @@
+const num = r1
+const num_new = r2
+const take = r3
+mov num,9
+out 3
+loop:
+
+in num_new 
+mov take, 4
+sub take,take,num
+add take,take,num_new
+out take
+sub num_new,num_new,take
+mov num,num_new
+jmp loop
+
+
+
+
+let num = 9
+let num_new = 0
+let take = 0
+output(3)
+
+while(true){
+num_new = input()
+take = 4 - num + num_new
+output(take)
+num = num_new - take
+}
+
+

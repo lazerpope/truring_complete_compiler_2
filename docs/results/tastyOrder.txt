@@ -1,0 +1,65 @@
+//read
+const count = r1
+const val = r2
+const candidate = r3
+const pointer = r4
+const lsv = r5
+const cptr = r6
+
+readLoop:
+in val
+pstore [count],val
+
+
+add count,count,1
+cmp count,16
+jne readLoop
+
+mov count,0
+mov candidate,255
+
+sortLoop:
+pload val, [count]
+
+cmp val,candidate
+ja skip
+cmp val,lsv
+jb skip
+
+mov candidate,val
+mov cptr,count
+
+skip:
+
+add count,count,1
+cmp count,16
+jne sortLoop
+
+
+
+add pointer,pointer,16
+mov lsv,candidate
+pstore [pointer],candidate
+sub pointer,pointer,15
+
+mov r13,255
+pstore [cptr],r13
+
+mov candidate,255
+mov count,0
+cmp pointer,16
+jne sortLoop
+
+
+mov count,16
+
+writeLoop:
+
+pload val, [count]
+out val
+
+add count,count,1
+cmp count,32
+jne writeLoop
+
+
