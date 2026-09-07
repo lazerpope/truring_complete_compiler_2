@@ -34,7 +34,7 @@ let distanceDirection = 1
 let low = time_0()
 let high = time_1()
 let previousClock = (high << 16) | (low >> 16)
-while (1) {
+while (true) {
     // Wait for the next 12 FPS frame.
     low = time_0()
     high = time_1()
