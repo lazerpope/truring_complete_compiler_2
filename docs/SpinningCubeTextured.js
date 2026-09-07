@@ -111,25 +111,25 @@ while (1) {
 
         let yRotationXNumerator = sourceX * horizontalCosine - sourceZ * horizontalSine
         let yRotationX = Math.abs(yRotationXNumerator) / game.TRIG_SCALE
-        if (yRotationXNumerator s < 0) {
+        if (yRotationXNumerator s< 0) {
             yRotationX = -yRotationX
         }
 
         let yRotationZNumerator = sourceX * horizontalSine + sourceZ * horizontalCosine
         let yRotationZ = Math.abs(yRotationZNumerator) / game.TRIG_SCALE
-        if (yRotationZNumerator s < 0) {
+        if (yRotationZNumerator s< 0) {
             yRotationZ = -yRotationZ
         }
 
         let xRotationYNumerator = sourceY * verticalCosine - yRotationZ * verticalSine
         let rotatedY = Math.abs(xRotationYNumerator) / game.TRIG_SCALE
-        if (xRotationYNumerator s < 0) {
+        if (xRotationYNumerator s< 0) {
             rotatedY = -rotatedY
         }
 
         let xRotationZNumerator = sourceY * verticalSine + yRotationZ * verticalCosine
         let rotatedZ = Math.abs(xRotationZNumerator) / game.TRIG_SCALE
-        if (xRotationZNumerator s < 0) {
+        if (xRotationZNumerator s< 0) {
             rotatedZ = -rotatedZ
         }
 
@@ -137,7 +137,7 @@ while (1) {
 
         let projectedXNumerator = yRotationX * game.FOCAL_LENGTH
         let projectedXOffset = Math.abs(projectedXNumerator) / depth
-        if (projectedXNumerator s < 0) {
+        if (projectedXNumerator s< 0) {
             projectedX[vertexIndex] = game.CENTER_X - projectedXOffset
         } else {
             projectedX[vertexIndex] = game.CENTER_X + projectedXOffset
@@ -145,13 +145,48 @@ while (1) {
 
         let projectedYNumerator = rotatedY * game.FOCAL_LENGTH
         let projectedYOffset = Math.abs(projectedYNumerator) / depth
-        if (projectedYNumerator s < 0) {
+        if (projectedYNumerator s< 0) {
             projectedY[vertexIndex] = game.CENTER_Y + projectedYOffset
         } else {
             projectedY[vertexIndex] = game.CENTER_Y - projectedYOffset
         }
 
         vertexIndex++
+    }
+
+    // Explicitly erase every old DDA outline. Face filling alone cannot erase
+    // every rounded edge pixel because a line can land just outside its quad.
+    let eraseEdgeIndex = 0
+    while (eraseEdgeIndex < 12) {
+        let eraseFirstVertex = edgeA[eraseEdgeIndex]
+        let eraseSecondVertex = edgeB[eraseEdgeIndex]
+        let eraseX1 = oldProjectedX[eraseFirstVertex]
+        let eraseY1 = oldProjectedY[eraseFirstVertex]
+        let eraseX2 = oldProjectedX[eraseSecondVertex]
+        let eraseY2 = oldProjectedY[eraseSecondVertex]
+        let eraseDeltaX = eraseX2 - eraseX1
+        let eraseDeltaY = eraseY2 - eraseY1
+        let eraseAbsoluteX = Math.abs(eraseDeltaX)
+        let eraseAbsoluteY = Math.abs(eraseDeltaY)
+        let eraseSteps = Math.max(eraseAbsoluteX, eraseAbsoluteY)
+        let erasePoint = 0
+
+        while (erasePoint <= eraseSteps) {
+            let eraseXDistance = eraseAbsoluteX * erasePoint / eraseSteps
+            let eraseYDistance = eraseAbsoluteY * erasePoint / eraseSteps
+            let eraseX = eraseX1 + eraseXDistance
+            let eraseY = eraseY1 + eraseYDistance
+            if (eraseDeltaX s< 0) {
+                eraseX = eraseX1 - eraseXDistance
+            }
+            if (eraseDeltaY s< 0) {
+                eraseY = eraseY1 - eraseYDistance
+            }
+            screen[eraseX][eraseY] = 0
+            erasePoint++
+        }
+
+        eraseEdgeIndex++
     }
 
     // Reset the outline visibility collected from the new front-facing sides.
@@ -201,7 +236,7 @@ while (1) {
 
             // Negative winding means that this face points toward the camera.
             let winding = (xB - xA) * (yC - yA) - (yB - yA) * (xC - xA)
-            if (winding s <= 0) {
+            if (winding s<= 0) {
                 if (drawPass == 1) {
                     visibleEdge[faceEdgeA[faceIndex]] = 1
                     visibleEdge[faceEdgeB[faceIndex]] = 1
@@ -230,7 +265,7 @@ while (1) {
                         let crossCD = (xD - xC) * (pixelY - yC) - (yD - yC) * (pixelX - xC)
                         let crossDA = (xA - xD) * (pixelY - yD) - (yA - yD) * (pixelX - xD)
 
-                        if (crossAB s <= 0 && crossBC s <= 0 && crossCD s <= 0 && crossDA s <= 0) {
+                        if (crossAB s<= 0 && crossBC s<= 0 && crossCD s<= 0 && crossDA s<= 0) {
                             let pixelColor = 0
                             if (drawPass == 1) {
                                 let textureX = (pixelX - minimumX) / 3
@@ -277,10 +312,10 @@ while (1) {
                 let yDistance = absoluteY * point / steps
                 let drawX = x1 + xDistance
                 let drawY = y1 + yDistance
-                if (deltaX s < 0) {
+                if (deltaX s< 0) {
                     drawX = x1 - xDistance
                 }
-                if (deltaY s < 0) {
+                if (deltaY s< 0) {
                     drawY = y1 - yDistance
                 }
                 screen[drawX][drawY] = game.OUTLINE_COLOR
