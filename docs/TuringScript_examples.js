@@ -810,7 +810,7 @@ let null = 1
 let undefined = 1
 
 # ============================================================================
-# CONFIRMED, NOT YET IMPLEMENTED: static structs
+# IMPLEMENTED: static structs
 # ============================================================================
 
 class Player {

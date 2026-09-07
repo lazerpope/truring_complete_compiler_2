@@ -81,8 +81,8 @@ Implemented stages are registered. The confirmed but not-yet-implemented struct 
 | 02 | `removeWhitespaces.ts` | Implemented | Collapse unnecessary code whitespace while preserving blank lines and exact comment contents. |
 | 03 | `validateSemicolons.ts` | Implemented | Reject semicolons except the two delimiters in a C-style `for` header. |
 | 04 | `validateIdentifiers.ts` | Implemented | Enforce identifier syntax, case rules, reserved names, duplicates, and the reserved `__ts_` prefix. |
-| 05 | `validateStaticStructs.ts` | Planned | Validate class schemas, fields, construction, access, scalar arguments, array-field rules, and all prohibited struct-as-value behavior. |
-| 06 | `lowerStaticStructs.ts` | Planned | Remove class schemas and instances by emitting deterministic scalar backing arrays and separate array-field arrays, then rewrite every valid field use. |
+| 05 | `validateStaticStructs.ts` | Implemented | Validate class schemas, fields, construction, access, scalar arguments, array-field rules, and all prohibited struct-as-value behavior. |
+| 06 | `lowerStaticStructs.ts` | Implemented | Remove class schemas and instances by emitting deterministic scalar backing arrays and separate array-field arrays, then rewrite every valid field use. |
 | 07 | `validateUnsupportedSyntax.ts` | Implemented | Reject prohibited JavaScript and low-level escape-hatch syntax after confirmed struct syntax has been removed. |
 | 08 | `collapseEquality.ts` | Implemented | Convert `===` to `==` and `!==` to `!=` outside comments. |
 | 09 | `lowerBooleanLiterals.ts` | Implemented | Convert `true` to `1` and `false` to `0`. |
@@ -107,7 +107,7 @@ Implemented stages are registered. The confirmed but not-yet-implemented struct 
 | 28 | `validateCanonicalSource.ts` | Implemented | Parse the final text against the canonical grammar and report anything that an earlier stage failed to remove. |
 | 29 | `formatCanonicalSource.ts` | Implemented | Apply deterministic final formatting without modifying comment contents. |
 
-Static structs are confirmed and awaiting the two documented precompiler stages. Function stages remain paused and intentionally absent from this order.
+Static structs and their two documented precompiler stages are implemented. Function stages remain paused and intentionally absent from this order.
 
 ## 5. Registration
 

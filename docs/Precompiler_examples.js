@@ -28,6 +28,27 @@ for (let semicolonIndex = 0; semicolonIndex < 3; semicolonIndex++) {
 // validateIdentifiers -------------------------------------------------------
 let valid_name$1 = 1
 
+// validateStaticStructs -----------------------------------------------------
+class ValidStruct {
+  scalar = 1
+  values = Array(2)
+}
+let validStruct = ValidStruct(5)
+validStruct.scalar++
+validStruct.values[0] = validStruct.scalar
+
+// lowerStaticStructs --------------------------------------------------------
+class LoweredStruct {
+  first = 10
+  items = [1, runtimeValue]
+  second = 20
+}
+let loweredStruct = LoweredStruct(30)
+loweredStruct.second += loweredStruct.first
+for (let structIndex in loweredStruct.items) {
+  output(loweredStruct.items[structIndex])
+}
+
 // validateUnsupportedSyntax -------------------------------------------------
 # Unsupported syntax is intentionally absent from this successful corpus.
 let supportedSyntax = valid_name$1 + 1

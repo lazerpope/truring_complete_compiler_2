@@ -1,14 +1,71 @@
 import type { PrecompilerPipeline } from '../compilerError'
 import { sourceLines, withErrors } from './shared'
 
-const RESERVED = new Set([
-  'Array', 'Math', 'arguments', 'async', 'await', 'break', 'case', 'catch', 'class', 'const',
-  'continue', 'counter', 'debugger', 'default', 'delete', 'do', 'else', 'enum', 'export',
-  'extends', 'false', 'finally', 'for', 'from', 'function', 'get', 'if', 'implements', 'import',
-  'in', 'Infinity', 'input', 'instanceof', 'interface', 'keyboard', 'let', 'NaN', 'new', 'null',
-  'of', 'output', 'package', 'private', 'protected', 'public', 'return', 'screen', 'set', 'static',
-  'super', 'switch', 'this', 'throw', 'time_0', 'time_1', 'true', 'try', 'typeof', 'undefined',
-  'var', 'void', 'while', 'with', 'yield',
+export const RESERVED_IDENTIFIERS = new Set([
+  'Array',
+  'Math',
+  'arguments',
+  'async',
+  'await',
+  'break',
+  'case',
+  'catch',
+  'class',
+  'const',
+  'continue',
+  'counter',
+  'debugger',
+  'default',
+  'delete',
+  'do',
+  'else',
+  'enum',
+  'export',
+  'extends',
+  'false',
+  'finally',
+  'for',
+  'from',
+  'function',
+  'get',
+  'if',
+  'implements',
+  'import',
+  'in',
+  'Infinity',
+  'input',
+  'instanceof',
+  'interface',
+  'keyboard',
+  'let',
+  'NaN',
+  'new',
+  'null',
+  'of',
+  'output',
+  'package',
+  'private',
+  'protected',
+  'public',
+  'return',
+  'screen',
+  'set',
+  'static',
+  'super',
+  'switch',
+  'this',
+  'throw',
+  'time_0',
+  'time_1',
+  'true',
+  'try',
+  'typeof',
+  'undefined',
+  'var',
+  'void',
+  'while',
+  'with',
+  'yield',
 ])
 
 export function doStep(pipeline: PrecompilerPipeline): PrecompilerPipeline {
@@ -29,10 +86,13 @@ export function doStep(pipeline: PrecompilerPipeline): PrecompilerPipeline {
       if (name.startsWith('__ts_')) {
         reasons.push(`Line ${line.lineNumber}: identifiers beginning with __ts_ are reserved`)
       }
-      if (RESERVED.has(name)) reasons.push(`Line ${line.lineNumber}: ${name} is reserved`)
+      if (RESERVED_IDENTIFIERS.has(name))
+        reasons.push(`Line ${line.lineNumber}: ${name} is reserved`)
       const previous = declared.get(name)
       if (previous !== undefined) {
-        reasons.push(`Line ${line.lineNumber}: duplicate declaration of ${name}; first declared on line ${previous}`)
+        reasons.push(
+          `Line ${line.lineNumber}: duplicate declaration of ${name}; first declared on line ${previous}`,
+        )
       } else declared.set(name, line.lineNumber)
     }
   }

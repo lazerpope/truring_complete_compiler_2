@@ -14,6 +14,7 @@ import { doStep as lowerMathConstants } from './precompiler/lowerMathConstants'
 import { doStep as lowerNestedHardwareReads } from './precompiler/lowerNestedHardwareReads'
 import { doStep as lowerNullishLiterals } from './precompiler/lowerNullishLiterals'
 import { doStep as lowerPostfixUpdates } from './precompiler/lowerPostfixUpdates'
+import { doStep as lowerStaticStructs } from './precompiler/lowerStaticStructs'
 import { doStep as lowerVarDeclarations } from './precompiler/lowerVarDeclarations'
 import { doStep as normalizeLineEndings } from './precompiler/normalizeLineEndings'
 import { doStep as replaceArrayLengths } from './precompiler/replaceArrayLengths'
@@ -24,6 +25,7 @@ import { doStep as validateConstantArrayBounds } from './precompiler/validateCon
 import { doStep as validateConstAssignments } from './precompiler/validateConstAssignments'
 import { doStep as validateIdentifiers } from './precompiler/validateIdentifiers'
 import { doStep as validateSemicolons } from './precompiler/validateSemicolons'
+import { doStep as validateStaticStructs } from './precompiler/validateStaticStructs'
 import { doStep as validateUnsupportedSyntax } from './precompiler/validateUnsupportedSyntax'
 import { doStep as compileCanonical } from './pipelines/compileCanonical'
 import {
@@ -179,6 +181,8 @@ compiler.registerPrecompiler('normalizeLineEndings', normalizeLineEndings)
 compiler.registerPrecompiler('removeWhitespaces', removeWhitespaces)
 compiler.registerPrecompiler('validateSemicolons', validateSemicolons)
 compiler.registerPrecompiler('validateIdentifiers', validateIdentifiers)
+compiler.registerPrecompiler('validateStaticStructs', validateStaticStructs)
+compiler.registerPrecompiler('lowerStaticStructs', lowerStaticStructs)
 compiler.registerPrecompiler('validateUnsupportedSyntax', validateUnsupportedSyntax)
 compiler.registerPrecompiler('collapseEquality', collapseEquality)
 compiler.registerPrecompiler('lowerBooleanLiterals', lowerBooleanLiterals)
