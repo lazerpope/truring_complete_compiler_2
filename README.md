@@ -6,6 +6,7 @@ Make sure main and persistent memory has enough size
 
 Usage examples at docs\TuringScript_examples.js
 Snake game at docs\SnakeGame.js
+SpinningCube game at docs\SpinningCube.js
 
 ## Project Setup
 
