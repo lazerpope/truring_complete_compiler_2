@@ -59,7 +59,7 @@ BinaryDigit     ::= "0" | "1"
 The following words cannot be user identifiers. This includes active language words, paused words, prohibited JavaScript words, built-ins, and hardware operations.
 
 ```text
-Array Math
+Array Math Screen8
 arguments async await
 break case catch class const continue counter
 debugger default delete do
@@ -91,6 +91,8 @@ SourceStatementList    ::= SourceStatement { NEWLINE { NEWLINE } SourceStatement
 
 SourceStatement        ::= SourceSimpleStatement
                          | StaticStructDeclaration
+                         | Screen8Declaration
+                         | Screen8PixelAssignment
                          | IfStatement
                          | WhileStatement
                          | CStyleForStatement
@@ -132,6 +134,8 @@ Semantic rules:
 - Ordinary expression statements such as `a + b` are prohibited.
 - Standalone blocks are prohibited.
 - Semicolons are prohibited except for the two separators in a C-style `for` header.
+
+`let screen = Screen8(...)` and `screen[x][y] = value` are dedicated macro productions. In those productions, `screen` is a fixed reserved token rather than an `Identifier`.
 
 ## 5. Source control-flow grammar
 
@@ -201,7 +205,29 @@ Further semantic rules:
 - Runtime array-literal elements execute from left to right whenever control reaches the declaration.
 - Whether repeatedly reaching `Array(size)` clears or preserves its existing static storage is implementation-defined. Programs must not depend on either behavior.
 
-## 7. Source static-struct grammar
+## 7. Source Screen8 framebuffer grammar
+
+```text
+Screen8Declaration     ::= "let" "screen" "=" "Screen8" "(" ConstantExpression ")"
+Screen8PixelAssignment ::= "screen" "[" SourceExpression "]"
+                          "[" SourceExpression "]" "=" SourceExpression
+```
+
+Semantic rules:
+
+- Exactly one declaration is allowed, at top level and before all pixel writes.
+- The resolution setting resolves at precompile time to `0..255`.
+- With the fixed framebuffer ending at `0x2000`, settings above `25` are always invalid; final capacity depends on compiled program size and is checked during postcompile.
+- The first index is zero-based `x`; the second is zero-based `y`.
+- Width is `4 * (setting + 1)` and height is `3 * (setting + 1)`.
+- The byte offset is `y * width + x`.
+- Constant out-of-bounds coordinates are errors; runtime coordinates are unchecked.
+- Index and color expressions are evaluated once in `x`, `y`, color order.
+- A constant color is in `0..255`; a runtime color contributes its low eight bits.
+- Screen8 is write-only. Reads, partial indexing, compound assignment, and updates are prohibited.
+- `screen` is not a runtime value and cannot be aliased, reassigned, passed, returned, or compared.
+
+## 8. Source static-struct grammar
 
 ```text
 StaticStructDeclaration ::= "class" Identifier "{" NEWLINE
@@ -235,7 +261,7 @@ Semantic rules:
 - Array fields support indexing, `.length`, and array `for...in`; the ordinary array rules apply after struct lowering.
 - Methods, constructors, static members, inheritance, `new`, dynamic field access, arrays of structs, nested structs, and nested arrays are prohibited.
 
-## 8. Source expression grammar
+## 9. Source expression grammar
 
 Assignment is deliberately absent from this grammar.
 
@@ -300,7 +326,7 @@ Semantic rules:
 - `&&` and `||` have defined short-circuit behavior in control-flow conditions. Their behavior elsewhere remains undefined as specified by the language specification.
 - Nested hardware reads are extracted into generated temporaries without changing evaluation or short-circuit order.
 
-## 9. Constant-expression grammar
+## 10. Constant-expression grammar
 
 This subset is used for `Array(size)`, constant `**`, and other required precompiler evaluation.
 
@@ -334,7 +360,7 @@ Semantic rules:
 - The precompiler performs no overflow correction or automatic intermediate truncation. Keeping calculations within the intended U32 range is the programmer's responsibility.
 - A final array size must be an integer in the U32 range and greater than zero.
 
-## 10. Canonical TuringScript grammar
+## 11. Canonical TuringScript grammar
 
 Built-in precompilers must reduce source syntax to this subset before the lean compiler runs.
 
@@ -352,6 +378,8 @@ CoreSimpleStatement     ::= CoreScalarDeclaration
                           | CoreHardwareReadDeclaration
                           | CoreHardwareReadAssignment
                           | CoreHardwareWrite
+                          | CoreGeneratedScreen8Init
+                          | CoreGeneratedScreen8Store
                           | BreakStatement
                           | ContinueStatement
 
@@ -366,6 +394,9 @@ CoreHardwareReadAssignment  ::= Identifier "=" HardwareReadExpression
 CoreHardwareWrite       ::= "output" "(" CoreOperand ")"
                           | "screen" "(" CoreOperand "," CoreOperand ")"
 CoreOperand             ::= Identifier | U16Literal
+
+CoreGeneratedScreen8Init  ::= "__ts_screen8_init" "(" U16Literal ")"
+CoreGeneratedScreen8Store ::= "__ts_screen8_store" "(" CoreOperand "," CoreOperand ")"
 
 CoreIfStatement         ::= "if" "(" CoreExpression ")" CoreBlock
                            [ { NEWLINE } "else" CoreBlock ]
@@ -404,16 +435,35 @@ Canonical semantic restrictions:
 - `true`, `false`, `null`, and `undefined` have become `0` or `1`.
 - Array literals have become `Array(size)` plus indexed assignments.
 - Static structs, struct construction, struct fields, `.length`, `Math`, constant `**`, `else if`, both forms of `for`, postfix updates, and compound assignments are absent.
+- Source-level `Screen8` declarations and two-dimensional `screen[x][y]` assignments are absent. Only compiler-generated `__ts_screen8_init` and `__ts_screen8_store` operations may remain for compilation into postcompile-private assembly pseudo-operations.
 - Strict equality spellings have been collapsed: `===` is `==`, and `!==` is `!=`.
 - Nested hardware reads and complex hardware-write arguments have become ordered temporary statements.
 - User-authored identifiers never begin with `__ts_`; generated identifiers do.
 - Comments remain attached to the first generated statement for their source statement.
 
-## 11. Program completion
+### Postcompile assembly forms
+
+The core compiler may emit these private pseudo-operations; they are not Symphony instructions and are never accepted from user source:
+
+```text
+__ts_screen8_init ResolutionSetting
+__ts_screen8_store OffsetRegister ColorRegister
+```
+
+The postcompile phase expands them into real `screen`, address arithmetic, and `store_8` instructions, then appends:
+
+```asm
+framebuffer:
+@0x2000
+```
+
+The final framebuffer must fit entirely below absolute byte address `0x2000`.
+
+## 12. Program completion
 
 The grammar does not require a terminal statement. The compiler appends neither a halt instruction nor a loop. Safe termination and any final infinite loop are the programmer's responsibility.
 
-## 12. Deliberate exclusions and implementation-defined behavior
+## 13. Deliberate exclusions and implementation-defined behavior
 
 - Low-level labels, `goto`, inline assembly, raw Symphony instructions, and other escape hatches are prohibited.
 - Repeated `Array(size)` clearing behavior is implementation-defined and must not be relied upon.

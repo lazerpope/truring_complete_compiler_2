@@ -23,7 +23,7 @@ This document is the source of truth for TuringScript. Sections marked **Confirm
 
 ### Confirmed
 
-The public compiler and every registered precompiler/compiler step use this pipeline contract:
+The public compiler and every registered precompiler, compiler, and postcompile step use this pipeline contract:
 
 ```ts
 class CompilerError extends Error {
@@ -37,7 +37,7 @@ interface PipelineErrorState {
 }
 
 interface PipelineDebugResult {
-  phase: 'precompiler' | 'pipeline'
+  phase: 'precompiler' | 'pipeline' | 'postcompile'
   stepName: string
   resultingCode: string
 }
@@ -67,14 +67,17 @@ type CompilerStep = (pipeline: PrecompilerPipeline) => CompilerResult
 - Partial assembly produced before an error is not executable output.
 - When `DEBUG_COLLECT` is `true`, the compiler records the resulting code after every named step and prints all snapshots to the console in registration order using styled console groups.
 
-The two compiler phases always run in this order:
+The three compiler phases always run in this order:
 
 ```text
 initial PrecompilerPipeline
   -> registered precompilers, in registration order
   -> registered compiler pipelines, in registration order
+  -> registered postcompile pipelines, in registration order
   -> final CompilerResult tuple
 ```
+
+Precompiler and compiler-pipeline input is TuringScript source. The compiler pipeline produces assembly text. Postcompile pipelines consume and emit assembly text and are the only phase allowed to finalize generated assembly-only resources such as the Pixel 8 framebuffer.
 
 ## 3. Precompiler boundary
 
@@ -219,6 +222,7 @@ The precompiler emits equivalent core TuringScript statements rather than making
 - Direct source use of `load_8`, `load_16`, `load_32`, `store_8`, `store_16`, and `store_32` is prohibited.
 - Compiler-managed variables and arrays use `pload` and `pstore` as 32-bit main RAM operations, despite their persistent-memory names in the target instruction set.
 - Internal expansion of `call`, `ret`, `push`, and `pop` may use `load_32` and `store_32`; this does not make those instructions available directly in TuringScript source.
+- The Screen8 postcompile pipeline may generate `store_8` only for writes into its reserved framebuffer region; this does not expose program-memory access to source code.
 - Immediate addresses are limited to U16, but register-addressed `pload` and `pstore` can use addresses constructed in registers.
 - The compiler does not check whether total allocation exceeds physical RAM. Available RAM is treated as practically unlimited, and exceeding it is the programmer's responsibility.
 
@@ -711,6 +715,88 @@ screen(setting, keyboard())
 
 A precompiler lowers nested hardware reads into deterministic generated temporaries. The transformation must preserve left-to-right evaluation and short-circuit behavior. In particular, a hardware read in the right operand of `&&` or `||` must remain inside the conditional path where that operand would have been evaluated; it must not be hoisted unconditionally.
 
+### Pixel 8 framebuffer macro
+
+TuringScript supports one precompiler-managed, write-only Pixel 8 framebuffer:
+
+```js
+let screen = Screen8(19)
+
+let GREEN_COLOR = 0b00011100
+screen[10][10] = GREEN_COLOR
+```
+
+`let screen = Screen8(resolutionSetting)` is a dedicated declaration-like macro, not an ordinary variable declaration. The words `screen` and `Screen8` remain reserved and cannot be used as ordinary identifiers. `validateIdentifiers` must recognize this one exact form and defer it to the Screen8 validation stage.
+
+The macro owns no ordinary variable or `pstore` pointer slot. Its framebuffer address exists only as the generated assembly label `framebuffer`.
+
+The declaration is allowed exactly once, must be at top level, and must appear before every framebuffer write. Only `let screen` is accepted; `const`, `var`, aliases, reassignment, passing, returning, comparison, and standalone use are prohibited. Direct `screen(setting, value)` hardware calls remain separate syntax.
+
+The resolution setting must be a precompiler-resolvable integer from `0` through `255`. Pixel 8 dimensions are:
+
+```text
+width  = 4 * (resolutionSetting + 1)
+height = 3 * (resolutionSetting + 1)
+bytes  = width * height
+```
+
+For setting `19`, the framebuffer is `80 * 60 = 4,800` bytes. Each byte is one `RRRGGGBB` color. For example, full green is `0b00011100` (`28`).
+
+Framebuffer writes use zero-based `[x][y]` coordinates. Their byte offset is:
+
+```text
+offset = y * width + x
+```
+
+Therefore `screen[10][10]` at resolution setting `19` addresses byte `810`. Constant coordinates outside the selected dimensions are precompiler errors. Runtime coordinates have no bounds checks. The `x` expression, `y` expression, and color expression are evaluated exactly once, from left to right. A constant color must fit in `0..255`; for a runtime value, `store_8` writes its low eight bits.
+
+The framebuffer is initially write-only. Pixel reads, compound assignments, increment/decrement, `.length`, row values, and using `screen[x]` by itself are prohibited. This avoids requiring generated `load_8` behavior.
+
+The Screen8 precompiler lowers the source syntax to reserved internal operations conceptually equivalent to:
+
+```text
+__ts_screen8_init(19)
+let __ts_screen8_x_0 = 10
+let __ts_screen8_y_0 = 10
+let __ts_screen8_color_0 = GREEN_COLOR
+let __ts_screen8_offset_0 = __ts_screen8_y_0 * 80 + __ts_screen8_x_0
+__ts_screen8_store(__ts_screen8_offset_0, __ts_screen8_color_0)
+```
+
+These `__ts_screen8_*` operations are compiler-private canonical forms and can never be written by the programmer. The core compiler evaluates their operands and emits postcompile-private assembly pseudo-operations. It does not expose general source access to `store_8`.
+
+The Screen8 postcompile pipeline expands initialization into:
+
+```asm
+mov r1, 0
+screen r1, 2
+mov r1, 2
+screen r1, 19
+mov r1, 1
+add r2, zr, framebuffer
+screen r1, r2
+```
+
+A generated pixel-store pseudo-operation with offset and color registers is expanded conceptually into:
+
+```asm
+add offsetRegister, offsetRegister, framebuffer
+store_8 [offsetRegister], colorRegister
+```
+
+Finally, postcompile appends exactly one framebuffer region:
+
+```asm
+framebuffer:
+@0x2000
+```
+
+`@0x2000` pads memory with zero bytes up to absolute byte address `0x2000`; it is not an instruction. The postcompiler must calculate the final address of `framebuffer` after expanding all pseudo-operations and report an error unless `framebufferAddress + framebufferByteCount <= 0x2000`. At resolution setting `19`, the framebuffer must begin at or before address `0x0D40` (`8192 - 4800`). The postcompiler must use assembly byte sizes, not source-line counts, for this calculation.
+
+Although the hardware resolution setting permits `0..255`, the fixed `@0x2000` boundary means settings above `25` can never fit even with an empty program. Smaller settings can still fail when the generated program occupies too much space before `framebuffer`. The validation stage may reject an impossible setting early, while final capacity is always checked after postcompile expansion.
+
+The postcompiler does not append a halt or jump. As with every TuringScript program, the programmer must prevent execution from falling through into appended data when necessary.
+
 ## 15. Mapping to Symphony assembly
 
 ### Confirmed
@@ -726,12 +812,15 @@ The core compiler is responsible for:
 - Allocating temporary registers and spilling values when required.
 - Emitting deterministic assembly text.
 - Preserving source comments on the first emitted line associated with a source statement.
+- Compiling generated Screen8 initialization and store operations into explicit postcompile-private pseudo-operations with register operands.
 
 Precompilers are responsible for source conveniences that can be represented in the core language, including `const`, `var`, booleans, static structs, array literals and lengths, array validation, large constants, `else if`, `for`, postfix increment/decrement, constant helpers, and registered helper expansions.
 
 `pload` and `pstore` are compiler-emitted assembly instructions, not TuringScript source operations. Source programs access compiler-managed RAM through variables and arrays.
 
 Source labels, `goto`, inline assembly, raw Symphony instructions, and other low-level escape hatches are prohibited.
+
+Postcompile pipelines are responsible for expanding compiler-private assembly pseudo-operations, appending the `framebuffer` label and `@0x2000` reservation, and validating that the selected framebuffer fits below byte address `0x2000`. Generated `store_8` is permitted for this framebuffer even though direct source use remains prohibited.
 
 The compiler appends no halt instruction or terminal loop. Ending execution safely is the programmer's responsibility. A program that must stop progressing can explicitly end in a suitable loop.
 
@@ -773,6 +862,7 @@ The output must use only features understood by the next registered step. The fi
 - Large U32 literals have become operations using U16 pieces.
 - Registered helper functions have been expanded into existing core statements.
 - Nested value-producing hardware calls have been extracted into generated temporaries without changing evaluation or short-circuit order.
+- The Screen8 macro and two-dimensional pixel assignments have become compiler-private `__ts_screen8_init` and `__ts_screen8_store` operations.
 - Simple statements are emitted one per line without semicolons.
 - Comments remain attached to the first generated line for their source statement.
 

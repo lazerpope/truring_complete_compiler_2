@@ -15,6 +15,12 @@ let screenSetting = 0
 screen(screenSetting, key)
 screen(screenSetting, 255)
 
+# Planned Pixel 8 framebuffer macro: resolution setting 19 is 80 by 60.
+# Coordinates are zero-based and ordered as screen[x][y].
+let screen = Screen8(19)
+let GREEN_COLOR = 0b00011100
+screen[10][10] = GREEN_COLOR
+
 # Timer: timeLow captures the low word and latches the matching high word.
 # Read timeHigh after timeLow to obtain the corresponding high word.
 let timeLow = time_0()
