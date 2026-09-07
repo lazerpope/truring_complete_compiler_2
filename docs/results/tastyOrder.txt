@@ -63,3 +63,30 @@ cmp count,32
 jne writeLoop
 
 
+
+
+const arr = Array(16)
+for (let i in arr) {
+    arr[i] = input()
+}
+
+let pointer = 0;
+
+for (i in arr) {
+    pointer = i
+    for (j = i; j < arr.length; j++) {
+        if (arr[j] <= arr[pointer]) {
+            pointer = j
+        }
+        
+    }
+    let swap = arr[i]
+    arr[i] = arr[pointer]
+    arr[pointer] = swap
+    
+}
+
+i = 0;
+for (i in arr) {
+    output(arr[i])
+}
