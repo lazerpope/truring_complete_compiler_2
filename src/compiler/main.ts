@@ -1,5 +1,6 @@
 import { doStep as collapseEquality } from './precompiler/collapseEquality'
 import { doStep as foldConstantExpressions } from './precompiler/foldConstantExpressions'
+import { doStep as lowerScreen8 } from './precompiler/lowerScreen8'
 import { doStep as formatCanonicalSource } from './precompiler/formatCanonicalSource'
 import { doStep as lowerArrayForLoops } from './precompiler/lowerArrayForLoops'
 import { doStep as lowerArrayLiterals } from './precompiler/lowerArrayLiterals'
@@ -25,6 +26,7 @@ import { doStep as validateConstantArrayBounds } from './precompiler/validateCon
 import { doStep as validateConstAssignments } from './precompiler/validateConstAssignments'
 import { doStep as validateIdentifiers } from './precompiler/validateIdentifiers'
 import { doStep as validateSemicolons } from './precompiler/validateSemicolons'
+import { doStep as validateScreen8 } from './precompiler/validateScreen8'
 import { doStep as validateStaticStructs } from './precompiler/validateStaticStructs'
 import { doStep as validateUnsupportedSyntax } from './precompiler/validateUnsupportedSyntax'
 import { doStep as compileCanonical } from './pipelines/compileCanonical'
@@ -190,6 +192,8 @@ compiler.registerPrecompiler('lowerNullishLiterals', lowerNullishLiterals)
 compiler.registerPrecompiler('validateConstAssignments', validateConstAssignments)
 compiler.registerPrecompiler('lowerMathConstants', lowerMathConstants)
 compiler.registerPrecompiler('foldConstantExpressions', foldConstantExpressions)
+compiler.registerPrecompiler('validateScreen8', validateScreen8)
+compiler.registerPrecompiler('lowerScreen8', lowerScreen8)
 compiler.registerPrecompiler('validateArrayRules', validateArrayRules)
 compiler.registerPrecompiler('lowerArrayLiterals', lowerArrayLiterals)
 compiler.registerPrecompiler('replaceArrayLengths', replaceArrayLengths)

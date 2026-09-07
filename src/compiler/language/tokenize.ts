@@ -20,6 +20,7 @@ export interface Token {
 const KEYWORDS = new Set([
   'Array',
   'Math',
+  'Screen8',
   'arguments',
   'async',
   'await',

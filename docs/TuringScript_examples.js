@@ -500,7 +500,7 @@ screen(keyboard(), input())
 screen(Math.min(firstSetting, secondSetting), values[index])
 
 # ============================================================================
-# CONFIRMED, NOT YET IMPLEMENTED: Pixel 8 framebuffer macro
+# IMPLEMENTED: Pixel 8 framebuffer macro
 # ============================================================================
 
 let screen = Screen8(19) // 80 x 60, write-only Pixel 8 framebuffer

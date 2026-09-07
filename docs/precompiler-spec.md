@@ -8,7 +8,7 @@ Development is precompiler-first. No new language lowering should be added to th
 
 ## 1. Pipeline contract
 
-Every precompiler, compiler pipeline, and postcompile pipeline has exactly this public shape:
+Every precompiler and compiler pipeline has exactly this public shape:
 
 ```ts
 type PrecompilerPipeline = [
@@ -20,7 +20,7 @@ type PrecompilerPipeline = [
   debug: {
     isEnabled: boolean
     results: Array<{
-      phase: 'precompiler' | 'pipeline' | 'postcompile'
+      phase: 'precompiler' | 'pipeline'
       stepName: string
       resultingCode: string
     }>
@@ -73,7 +73,7 @@ It does not also lower booleans, rewrite declarations, or format whitespace.
 
 ## 4. Ordered built-in stages
 
-Implemented stages are registered. The confirmed but not-yet-implemented Screen8 stages occupy their required future positions below; registration order must match this table once they are added.
+All listed stages are implemented and registration order must match this table.
 
 | Order | Stage/file | Status | Single responsibility |
 | ---: | --- | --- | --- |
@@ -90,8 +90,8 @@ Implemented stages are registered. The confirmed but not-yet-implemented Screen8
 | 11 | `validateConstAssignments.ts` | Implemented | Record `const` bindings and reject later reassignment while leaving declarations intact for constant evaluation. |
 | 12 | `lowerMathConstants.ts` | Implemented | Replace `Math.U16_MAX`, `Math.S16_MAX`, `Math.U32_MAX`, `Math.S32_MIN`, and `Math.S32_MAX` with their U32 values. |
 | 13 | `foldConstantExpressions.ts` | Implemented | Resolve known `const` names, evaluate required constant expressions, and partially fold literal `+`, `-`, `*`, and `/` subexpressions without treating mutable variables as constants. |
-| 14 | `validateScreen8.ts` | Planned | Validate the single fixed Screen8 declaration, constant resolution, write-only `[x][y]` access, bounds known at precompile time, and prohibited screen-as-value behavior. |
-| 15 | `lowerScreen8.ts` | Planned | Lower Screen8 initialization and pixel writes into deterministic generated temporaries plus compiler-private `__ts_screen8_init` and `__ts_screen8_store` operations. |
+| 14 | `validateScreen8.ts` | Implemented | Validate the single fixed Screen8 declaration, constant resolution, write-only `[x][y]` access, bounds known at precompile time, and prohibited screen-as-value behavior. |
+| 15 | `lowerScreen8.ts` | Implemented | Lower Screen8 initialization into three canonical `screen` calls and pixel writes into deterministic generated temporaries plus compiler-private `__ts_screen8_store` operations. |
 | 16 | `validateArrayRules.ts` | Implemented | Collect ordinary and struct-generated array metadata and reject zero sizes, runtime sizes, nested arrays, aliasing, reassignment, comparison, passing, and other invalid array use. |
 | 17 | `lowerArrayLiterals.ts` | Implemented | Expand ordinary and struct-generated array literals into `Array(size)` plus ordered indexed assignments; holes become zero and a trailing comma is ignored. |
 | 18 | `replaceArrayLengths.ts` | Implemented | Replace each valid ordinary or struct-generated `array.length` with its known constant size. |
@@ -109,7 +109,7 @@ Implemented stages are registered. The confirmed but not-yet-implemented Screen8
 | 30 | `validateCanonicalSource.ts` | Implemented | Parse the final text against the canonical grammar and report anything that an earlier stage failed to remove. |
 | 31 | `formatCanonicalSource.ts` | Implemented | Apply deterministic final formatting without modifying comment contents. |
 
-Static structs and their two documented precompiler stages are implemented. Screen8 is confirmed but its two stages are planned. Function stages remain paused and intentionally absent from this order.
+Static structs and Screen8 are implemented. Function stages remain paused and intentionally absent from this order.
 
 ## 5. Registration
 
@@ -123,13 +123,10 @@ compiler.registerPrecompiler('collapseEquality', collapseEquality)
 
 Registration order is execution order and therefore part of compiler behavior. The table above is the normative target order; implemented stages keep their relative table order even while intervening stages are still planned.
 
-### Compiler and postcompile registration
-
-Screen8 adds a third ordered phase after canonical compilation:
+### Compiler registration
 
 ```ts
 compiler.registerPipeline('compileCanonical', compileCanonical)
-compiler.registerPostcompile('finalizeScreen8Framebuffer', finalizeScreen8Framebuffer)
 ```
 
 The complete flow is:
@@ -138,25 +135,17 @@ The complete flow is:
 TuringScript source
   -> precompilers
   -> canonical compiler pipeline
-  -> assembly containing private __ts_screen8_* pseudo-operations
-  -> postcompile pipelines
   -> final Symphony assembly
 ```
 
-Postcompile stages use the same pipeline tuple and error/debug behavior as every other stage, but tuple item `0` contains assembly rather than TuringScript. `Compiler` therefore needs ordered `postcompilers`, `registerPostcompile`, and `applyPostcompilers` members. `compile()` runs postcompile stages only when precompilation and compilation completed without errors.
+For Screen8, `compileCanonical` has four responsibilities:
 
-The planned `finalizeScreen8Framebuffer.ts` postcompile stage has four responsibilities:
-
-1. Expand the private Screen8 initialization pseudo-operation into mode `2`, the selected resolution setting, and data-offset configuration pointing at `framebuffer`.
+1. Compile the three generated canonical `screen` calls, resolving the private framebuffer operand to the `framebuffer` label.
 2. Expand each private pixel-store pseudo-operation into framebuffer address addition plus `store_8`.
 3. Calculate the final assembly byte offset and reject a framebuffer that would extend past absolute address `0x2000`.
 4. Append exactly one `framebuffer:` label followed by `@0x2000`.
 
-The postcompiler accepts only pseudo-operations emitted by the trusted compiler pipeline. User source cannot spell them because identifiers beginning with `__ts_`, labels, inline assembly, and raw memory operations are rejected before compilation.
-
-| Postcompile order | Stage/file | Status | Single responsibility |
-| ---: | --- | --- | --- |
-| 01 | `finalizeScreen8Framebuffer.ts` | Planned | Expand trusted Screen8 pseudo-operations, validate byte capacity, and append the single framebuffer region ending at `0x2000`. |
+The compiler accepts these private operations only after the trusted precompiler stages. User source cannot spell them because identifiers beginning with `__ts_`, labels, inline assembly, and raw memory operations are rejected before lowering.
 
 ## 6. Error behavior
 

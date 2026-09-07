@@ -46,7 +46,7 @@ export function initMonaco(source: Ref<string>): MonacoEditorController {
         'continue',
       ],
       constants: ['true', 'false', 'null', 'undefined'],
-      builtins: ['input', 'keyboard', 'time_0', 'time_1', 'counter', 'output', 'screen'],
+      builtins: ['input', 'keyboard', 'time_0', 'time_1', 'counter', 'output', 'screen', 'Screen8'],
       brackets: [
         { open: '{', close: '}', token: 'delimiter.curly' },
         { open: '[', close: ']', token: 'delimiter.square' },
@@ -77,6 +77,7 @@ export function initMonaco(source: Ref<string>): MonacoEditorController {
                 '@constants': 'constant.language',
                 '@builtins': 'function',
                 Array: 'type.identifier',
+                Screen8: 'type.identifier',
                 Math: 'namespace',
                 '@default': 'identifier',
               },
@@ -316,6 +317,21 @@ export function initMonaco(source: Ref<string>): MonacoEditorController {
         kind: monaco.languages.CompletionItemKind.Function,
         detail: 'Array(size): compile-time-sized static array',
         insertText: 'Array(${1:size})',
+        insertTextRules: snippetRule,
+      },
+      {
+        label: 'Screen8',
+        kind: monaco.languages.CompletionItemKind.Constructor,
+        detail: 'Configure the single write-only 8-bit framebuffer screen',
+        insertText: 'let screen = Screen8(${1:19})',
+        insertTextRules: snippetRule,
+      },
+      {
+        label: 'screen[x][y]',
+        filterText: 'screen',
+        kind: monaco.languages.CompletionItemKind.Snippet,
+        detail: 'Write one 8-bit framebuffer pixel',
+        insertText: 'screen[${1:x}][${2:y}] = ${3:color}',
         insertTextRules: snippetRule,
       },
     ]

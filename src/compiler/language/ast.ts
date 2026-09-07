@@ -11,6 +11,7 @@ export type Statement =
   | DeclarationStatement
   | AssignmentStatement
   | HardwareWriteStatement
+  | Screen8StoreStatement
   | IfStatement
   | WhileStatement
   | BreakStatement
@@ -38,6 +39,12 @@ export interface HardwareWriteStatement extends StatementBase {
   type: 'hardwareWrite'
   operation: 'output' | 'screen'
   arguments: Expression[]
+}
+
+export interface Screen8StoreStatement extends StatementBase {
+  type: 'screen8Store'
+  offset: Expression
+  value: Expression
 }
 
 export interface IfStatement extends StatementBase {
@@ -75,6 +82,7 @@ export type Expression =
   | UnaryExpression
   | BinaryExpression
   | HardwareReadExpression
+  | Screen8BufferExpression
 
 export interface LiteralExpression {
   type: 'literal'
@@ -147,5 +155,11 @@ export type BinaryOperator =
 export interface HardwareReadExpression {
   type: 'hardwareRead'
   operation: 'input' | 'keyboard' | 'time_0' | 'time_1' | 'counter'
+  location: SourceLocation
+}
+
+export interface Screen8BufferExpression {
+  type: 'screen8Buffer'
+  byteCount: number
   location: SourceLocation
 }

@@ -100,8 +100,19 @@ class CanonicalParser {
       case 'var':
         throw this.error(token, `${token.value} must be removed by a precompiler before canonical compilation`)
       default:
+        if (token.value === '__ts_screen8_store') return this.parseScreen8Store()
         return this.parseAssignment()
     }
+  }
+
+  private parseScreen8Store(): Statement {
+    const start = this.advance()
+    this.expectValue('(')
+    const offset = this.parseExpression()
+    this.expectValue(',')
+    const value = this.parseExpression()
+    this.expectValue(')')
+    return { type: 'screen8Store', offset, value, location: start.location }
   }
 
   private parseDeclaration(): Statement {
@@ -259,6 +270,14 @@ class CanonicalParser {
 
     if (token.kind === 'identifier') {
       this.advance()
+      const screen8Buffer = token.value.match(/^__ts_screen8_buffer_(\d+)$/)
+      if (screen8Buffer) {
+        const byteCount = Number(screen8Buffer[1])
+        if (!Number.isSafeInteger(byteCount) || byteCount <= 0) {
+          throw this.error(token, 'Invalid generated Screen8 framebuffer size')
+        }
+        return { type: 'screen8Buffer', byteCount, location: token.location }
+      }
       if (this.matchValue('[')) {
         const index = this.parseExpression()
         this.expectValue(']')

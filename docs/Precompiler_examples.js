@@ -84,6 +84,16 @@ let partiallyFolded = runtimeValue + 4 * 2
 const foldedSize = (5 * 2) + (2 ** 3)
 let foldedValues = Array(foldedSize)
 
+// validateScreen8 ----------------------------------------------------------
+const screenResolution = 19
+let screen = Screen8(screenResolution)
+screen[10][10] = 0b00011100
+
+// lowerScreen8 -------------------------------------------------------------
+let runtimePixelX = keyboard()
+let runtimePixelY = input()
+screen[runtimePixelX][runtimePixelY] = counter()
+
 // validateArrayRules --------------------------------------------------------
 let validArray = Array(10)
 validArray[0] = copiedFixedValue

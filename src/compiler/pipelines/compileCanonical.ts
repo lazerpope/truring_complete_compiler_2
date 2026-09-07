@@ -72,6 +72,8 @@ class AssemblyCompiler {
   private readonly loops: LoopLabels[] = []
   private labelCounter = 0
   private nextAddress = 0
+  private framebufferByteCount: number | undefined
+  private framebufferLocation: SourceLocation | undefined
 
   constructor(private readonly program: Program) {
     this.allocateStatements(program.statements)
@@ -79,6 +81,19 @@ class AssemblyCompiler {
 
   compile(): string {
     this.compileStatements(this.program.statements)
+    if (this.framebufferByteCount !== undefined) {
+      const programByteCount = this.lines.filter((line) => {
+        const trimmed = line.trim()
+        return trimmed !== '' && !trimmed.startsWith('#') && !trimmed.endsWith(':')
+      }).length * 4
+      if (programByteCount + this.framebufferByteCount > 0x2000) {
+        throw this.error(
+          this.framebufferLocation!,
+          `Program (${programByteCount} bytes) and Screen8 framebuffer (${this.framebufferByteCount} bytes) exceed 0x2000`,
+        )
+      }
+      this.lines.push('', '_pre_framebuffer_label:', 'jmp _pre_framebuffer_label', 'framebuffer:', '@0x2000')
+    }
     return this.lines.join('\n')
   }
 
@@ -137,6 +152,9 @@ class AssemblyCompiler {
         return
       case 'hardwareWrite':
         this.compileHardwareWrite(statement.operation, statement.arguments, statement.location)
+        return
+      case 'screen8Store':
+        this.compileScreen8Store(statement.offset, statement.value, statement.location)
         return
       case 'if':
         this.compileIf(statement)
@@ -206,6 +224,22 @@ class AssemblyCompiler {
     if (args.length !== 2) throw this.error(location, 'screen requires exactly two arguments')
     const setting = this.compileExpression(this.requiredExpression(args[0], location))
     const valueExpression = this.requiredExpression(args[1], location)
+    if (valueExpression.type === 'screen8Buffer') {
+      if (
+        this.framebufferByteCount !== undefined &&
+        this.framebufferByteCount !== valueExpression.byteCount
+      ) {
+        throw this.error(location, 'Conflicting generated Screen8 framebuffer sizes')
+      }
+      this.framebufferByteCount = valueExpression.byteCount
+      this.framebufferLocation = valueExpression.location
+      const value = this.registers.acquire(valueExpression.location)
+      this.emit(`add ${value}, zr, framebuffer`)
+      this.emit(`screen ${setting}, ${value}`)
+      this.registers.release(value)
+      this.registers.release(setting)
+      return
+    }
     if (valueExpression.type === 'literal' && valueExpression.value <= 0xffff) {
       this.emit(`screen ${setting}, ${valueExpression.value}`)
       this.registers.release(setting)
@@ -215,6 +249,22 @@ class AssemblyCompiler {
     this.emit(`screen ${setting}, ${value}`)
     this.registers.release(value)
     this.registers.release(setting)
+  }
+
+  private compileScreen8Store(
+    offsetExpression: Expression,
+    valueExpression: Expression,
+    location: SourceLocation,
+  ): void {
+    if (this.framebufferByteCount === undefined) {
+      throw this.error(location, 'Generated Screen8 pixel write appeared before initialization')
+    }
+    const offset = this.compileExpression(offsetExpression)
+    const value = this.compileExpression(valueExpression)
+    this.emit(`add ${offset}, ${offset}, framebuffer`)
+    this.emit(`store_8 [${offset}], ${value}`)
+    this.registers.release(value)
+    this.registers.release(offset)
   }
 
   private compileIf(statement: Extract<Statement, { type: 'if' }>): void {
@@ -315,6 +365,8 @@ class AssemblyCompiler {
         this.emit(`${instruction} ${register}`)
         return register
       }
+      case 'screen8Buffer':
+        throw this.error(expression.location, 'Generated Screen8 buffer may only configure screen data offset')
       case 'unary': {
         const register = this.compileExpression(expression.operand)
         if (expression.operator === '-') this.emit(`neg ${register}, ${register}`)

@@ -1,5 +1,6 @@
 import type { PrecompilerPipeline } from '../compilerError'
 import { sourceLines, withErrors } from './shared'
+import { parseScreen8Declaration } from './screen8'
 
 export const RESERVED_IDENTIFIERS = new Set([
   'Array',
@@ -49,6 +50,7 @@ export const RESERVED_IDENTIFIERS = new Set([
   'public',
   'return',
   'screen',
+  'Screen8',
   'set',
   'static',
   'super',
@@ -74,11 +76,15 @@ export function doStep(pipeline: PrecompilerPipeline): PrecompilerPipeline {
   const declared = new Map<string, number>()
 
   for (const line of sourceLines(pipeline[0])) {
+    const isScreen8Declaration = parseScreen8Declaration(line.code) !== undefined
     const declarations = [
       ...line.code.matchAll(/(?:^|\bfor\s*\()\s*(?:let|const|var)\s+([^\s=;,)]+)/g),
     ]
     for (const declaration of declarations) {
       const name = declaration[1] ?? ''
+      // `screen` is reserved everywhere except the language's one dedicated
+      // Screen8 declaration. validateScreen8 owns validation of that form.
+      if (name === 'screen' && isScreen8Declaration) continue
       if (!/^[A-Za-z_$][A-Za-z0-9_$]*$/.test(name)) {
         reasons.push(`Line ${line.lineNumber}: invalid identifier ${JSON.stringify(name)}`)
         continue

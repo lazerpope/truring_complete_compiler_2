@@ -217,7 +217,7 @@ Semantic rules:
 
 - Exactly one declaration is allowed, at top level and before all pixel writes.
 - The resolution setting resolves at precompile time to `0..255`.
-- With the fixed framebuffer ending at `0x2000`, settings above `25` are always invalid; final capacity depends on compiled program size and is checked during postcompile.
+- With the fixed framebuffer ending at `0x2000`, settings above `25` are always invalid; final capacity depends on compiled program size and is checked by the compiler.
 - The first index is zero-based `x`; the second is zero-based `y`.
 - Width is `4 * (setting + 1)` and height is `3 * (setting + 1)`.
 - The byte offset is `y * width + x`.
@@ -378,7 +378,6 @@ CoreSimpleStatement     ::= CoreScalarDeclaration
                           | CoreHardwareReadDeclaration
                           | CoreHardwareReadAssignment
                           | CoreHardwareWrite
-                          | CoreGeneratedScreen8Init
                           | CoreGeneratedScreen8Store
                           | BreakStatement
                           | ContinueStatement
@@ -395,7 +394,6 @@ CoreHardwareWrite       ::= "output" "(" CoreOperand ")"
                           | "screen" "(" CoreOperand "," CoreOperand ")"
 CoreOperand             ::= Identifier | U16Literal
 
-CoreGeneratedScreen8Init  ::= "__ts_screen8_init" "(" U16Literal ")"
 CoreGeneratedScreen8Store ::= "__ts_screen8_store" "(" CoreOperand "," CoreOperand ")"
 
 CoreIfStatement         ::= "if" "(" CoreExpression ")" CoreBlock
@@ -435,22 +433,22 @@ Canonical semantic restrictions:
 - `true`, `false`, `null`, and `undefined` have become `0` or `1`.
 - Array literals have become `Array(size)` plus indexed assignments.
 - Static structs, struct construction, struct fields, `.length`, `Math`, constant `**`, `else if`, both forms of `for`, postfix updates, and compound assignments are absent.
-- Source-level `Screen8` declarations and two-dimensional `screen[x][y]` assignments are absent. Only compiler-generated `__ts_screen8_init` and `__ts_screen8_store` operations may remain for compilation into postcompile-private assembly pseudo-operations.
+- Source-level `Screen8` declarations and two-dimensional `screen[x][y]` assignments are absent. Initialization is three canonical `screen` calls; only the compiler-generated `__ts_screen8_buffer_<bytes>` operand and `__ts_screen8_store` operation may remain.
 - Strict equality spellings have been collapsed: `===` is `==`, and `!==` is `!=`.
 - Nested hardware reads and complex hardware-write arguments have become ordered temporary statements.
 - User-authored identifiers never begin with `__ts_`; generated identifiers do.
 - Comments remain attached to the first generated statement for their source statement.
 
-### Postcompile assembly forms
+### Compiler-owned Screen8 assembly forms
 
-The core compiler may emit these private pseudo-operations; they are not Symphony instructions and are never accepted from user source:
+Canonical source may contain these private generated forms; they are never accepted from user source:
 
 ```text
-__ts_screen8_init ResolutionSetting
-__ts_screen8_store OffsetRegister ColorRegister
+screen(1, __ts_screen8_buffer_ByteCount)
+__ts_screen8_store(OffsetOperand, ColorOperand)
 ```
 
-The postcompile phase expands them into real `screen`, address arithmetic, and `store_8` instructions, then appends:
+The compiler emits real `screen`, address arithmetic, and `store_8` instructions, then appends:
 
 ```asm
 framebuffer:
