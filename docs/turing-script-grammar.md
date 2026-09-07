@@ -8,7 +8,7 @@ This file defines two textual languages:
 1. **Source TuringScript**, accepted before built-in precompilers run.
 2. **Canonical TuringScript**, emitted by the final built-in precompiler and accepted by the lean assembly compiler.
 
-Function and static-struct productions are intentionally omitted until those designs resume.
+Function productions remain intentionally omitted. Static-struct syntax is specified as a confirmed precompiler-only source feature and is absent from canonical TuringScript.
 
 ## 1. Notation
 
@@ -90,6 +90,7 @@ SourceProgram          ::= { NEWLINE } [ SourceStatementList ] EOF
 SourceStatementList    ::= SourceStatement { NEWLINE { NEWLINE } SourceStatement } { NEWLINE }
 
 SourceStatement        ::= SourceSimpleStatement
+                         | StaticStructDeclaration
                          | IfStatement
                          | WhileStatement
                          | CStyleForStatement
@@ -104,10 +105,10 @@ SourceSimpleStatement  ::= VariableDeclaration
 
 VariableDeclaration    ::= DeclarationKind Identifier "=" DeclarationInitializer
 DeclarationKind        ::= "let" | "const" | "var"
-DeclarationInitializer ::= ArrayCreation | ArrayLiteral | SourceExpression
+DeclarationInitializer ::= ArrayCreation | ArrayLiteral | StructConstruction | SourceExpression
 
 AssignmentStatement    ::= AssignmentTarget AssignmentOperator SourceExpression
-AssignmentTarget       ::= Identifier | ArrayAccess
+AssignmentTarget       ::= Identifier | ArrayAccess | StructScalarField | StructArrayAccess
 AssignmentOperator     ::= "=" | "+=" | "-=" | "*=" | "/=" | "%="
 
 UpdateStatement        ::= AssignmentTarget ( "++" | "--" )
@@ -150,7 +151,8 @@ ForInitializer         ::= "let" Identifier "=" SourceExpression
 ForUpdate              ::= AssignmentTarget AssignmentOperator SourceExpression
                          | AssignmentTarget ( "++" | "--" )
 
-ArrayForStatement      ::= "for" "(" [ "let" ] Identifier "in" Identifier ")" Block
+ArrayForStatement      ::= "for" "(" [ "let" ] Identifier "in" ArrayIterable ")" Block
+ArrayIterable          ::= Identifier | StructArrayField
 ```
 
 Semantic rules:
@@ -158,7 +160,7 @@ Semantic rules:
 - Braces are mandatory.
 - Every C-style `for` clause is mandatory.
 - A C-style `for` declaration is scalar; it cannot declare an array.
-- Both array-loop forms require `values` to be a declared array.
+- Both array-loop forms require their iterable to be a declared array or a known struct array field.
 - `for (let index in values)` declares `index` in the single program-wide scope.
 - `for (index in values)` reuses a previously declared scalar `index` and resets it to `0` when the loop is reached.
 - Both forms visit indexes `0` through `values.length - 1`.
@@ -199,7 +201,41 @@ Further semantic rules:
 - Runtime array-literal elements execute from left to right whenever control reaches the declaration.
 - Whether repeatedly reaching `Array(size)` clears or preserves its existing static storage is implementation-defined. Programs must not depend on either behavior.
 
-## 7. Source expression grammar
+## 7. Source static-struct grammar
+
+```text
+StaticStructDeclaration ::= "class" Identifier "{" NEWLINE
+                            StaticStructField
+                            { NEWLINE StaticStructField }
+                            { NEWLINE } "}"
+
+StaticStructField       ::= Identifier "=" StructFieldInitializer
+StructFieldInitializer ::= ArrayCreation | ArrayLiteral | SourceExpression
+
+StructConstruction      ::= Identifier "(" [ StructScalarArguments ] ")"
+StructScalarArguments   ::= SourceExpression { "," SourceExpression }
+
+StructScalarField       ::= Identifier "." Identifier
+StructArrayField        ::= Identifier "." Identifier
+StructArrayAccess       ::= StructArrayField "[" SourceExpression "]"
+StructArrayLength       ::= StructArrayField "." "length"
+```
+
+Whether a two-part member expression is a scalar field or an array field is determined from the class schema during struct validation. This syntax is source-only and must be removed before canonical parsing.
+
+Semantic rules:
+
+- Class declarations are top-level, nonempty, unique, and must precede construction.
+- Every field is uniquely named within its class and requires an initializer.
+- Scalar constructor arguments map only to scalar fields in scalar-field declaration order; missing arguments use defaults and excess arguments are errors.
+- Array fields use their schema initializer and do not consume constructor arguments.
+- Every instance has one generated scalar backing array and one independent generated array for each array field. No scalar backing array is emitted when a class has no scalar fields.
+- Struct identifiers and array fields are not values. They cannot be reassigned, copied, compared, returned, or passed.
+- Scalar fields and array elements are mutable even through a `const` instance.
+- Array fields support indexing, `.length`, and array `for...in`; the ordinary array rules apply after struct lowering.
+- Methods, constructors, static members, inheritance, `new`, dynamic field access, arrays of structs, nested structs, and nested arrays are prohibited.
+
+## 8. Source expression grammar
 
 Assignment is deliberately absent from this grammar.
 
@@ -232,6 +268,9 @@ PrimaryExpression      ::= IntegerLiteral
                          | Identifier
                          | ArrayAccess
                          | ArrayLength
+                         | StructScalarField
+                         | StructArrayAccess
+                         | StructArrayLength
                          | MathExpression
                          | HardwareReadExpression
                          | "(" SourceExpression ")"
@@ -261,7 +300,7 @@ Semantic rules:
 - `&&` and `||` have defined short-circuit behavior in control-flow conditions. Their behavior elsewhere remains undefined as specified by the language specification.
 - Nested hardware reads are extracted into generated temporaries without changing evaluation or short-circuit order.
 
-## 8. Constant-expression grammar
+## 9. Constant-expression grammar
 
 This subset is used for `Array(size)`, constant `**`, and other required precompiler evaluation.
 
@@ -295,7 +334,7 @@ Semantic rules:
 - The precompiler performs no overflow correction or automatic intermediate truncation. Keeping calculations within the intended U32 range is the programmer's responsibility.
 - A final array size must be an integer in the U32 range and greater than zero.
 
-## 9. Canonical TuringScript grammar
+## 10. Canonical TuringScript grammar
 
 Built-in precompilers must reduce source syntax to this subset before the lean compiler runs.
 
@@ -318,7 +357,8 @@ CoreSimpleStatement     ::= CoreScalarDeclaration
 
 CoreScalarDeclaration   ::= "let" Identifier "=" CoreExpression
 CoreArrayDeclaration    ::= "let" Identifier "=" "Array" "(" U32SizeLiteral ")"
-CoreAssignment          ::= AssignmentTarget "=" CoreExpression
+CoreAssignment          ::= CoreAssignmentTarget "=" CoreExpression
+CoreAssignmentTarget    ::= Identifier | Identifier "[" CoreExpression "]"
 
 CoreHardwareReadDeclaration ::= "let" GeneratedOrUserIdentifier "=" HardwareReadExpression
 CoreHardwareReadAssignment  ::= Identifier "=" HardwareReadExpression
@@ -363,17 +403,18 @@ Canonical semantic restrictions:
 - Only `let` remains; `const` and `var` checks have already run.
 - `true`, `false`, `null`, and `undefined` have become `0` or `1`.
 - Array literals have become `Array(size)` plus indexed assignments.
-- `.length`, `Math`, constant `**`, `else if`, both forms of `for`, postfix updates, and compound assignments are absent.
+- Static structs, struct construction, struct fields, `.length`, `Math`, constant `**`, `else if`, both forms of `for`, postfix updates, and compound assignments are absent.
 - Strict equality spellings have been collapsed: `===` is `==`, and `!==` is `!=`.
 - Nested hardware reads and complex hardware-write arguments have become ordered temporary statements.
 - User-authored identifiers never begin with `__ts_`; generated identifiers do.
 - Comments remain attached to the first generated statement for their source statement.
 
-## 10. Program completion
+## 11. Program completion
 
 The grammar does not require a terminal statement. The compiler appends neither a halt instruction nor a loop. Safe termination and any final infinite loop are the programmer's responsibility.
 
-## 11. Deliberate exclusions and implementation-defined behavior
+## 12. Deliberate exclusions and implementation-defined behavior
 
 - Low-level labels, `goto`, inline assembly, raw Symphony instructions, and other escape hatches are prohibited.
 - Repeated `Array(size)` clearing behavior is implementation-defined and must not be relied upon.
+- Repeated struct-instance initialization inherits the implementation-defined behavior of its generated backing arrays.

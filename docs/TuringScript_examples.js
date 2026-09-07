@@ -810,8 +810,47 @@ let null = 1
 let undefined = 1
 
 # ============================================================================
-# PAUSED: functions and static structs
+# CONFIRMED, NOT YET IMPLEMENTED: static structs
 # ============================================================================
 
-# Function ABI and final function grammar are intentionally not reviewed here.
-# Static-struct declaration and lowering syntax are intentionally not reviewed here.
+class Player {
+  health = 100
+  inventory = Array(8)
+  position = [0, 0]
+  score = 0
+}
+
+let player = Player(75, 500)
+const defaultPlayer = Player()
+
+player.health = 80
+player.health++
+player.score += 10
+player.inventory[2] = 50
+player.inventory[index]++
+player.position[0] = player.position[1] + 1
+let inventorySize = player.inventory.length
+
+for (let itemIndex in player.inventory) {
+  output(player.inventory[itemIndex])
+}
+
+# Prohibited struct forms:
+player = defaultPlayer
+let playerAlias = player
+let samePlayer = player == defaultPlayer
+player.inventory = otherInventory
+let standaloneInventory = player.inventory
+let dynamicField = player[field]
+
+class Empty {
+}
+
+class InvalidMethods {
+  value = 0
+  update() {
+    value++
+  }
+}
+
+# Functions remain paused; their ABI and final grammar are intentionally absent.

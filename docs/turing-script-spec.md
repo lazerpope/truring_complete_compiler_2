@@ -94,7 +94,7 @@ Examples of precompiler responsibilities:
 - Validate `const` assignments, then lower `const` to `let`.
 - Lower `var` to `let`.
 - Lower booleans to `0` and `1`.
-- Lower static structs/classes into ordinary variables.
+- Lower static struct classes and instances into generated ordinary scalar-backing and array-field arrays.
 - Lower array literals into an allocation followed by element assignments.
 - Resolve array sizes and replace `array.length` with the known constant size.
 - Lower `else if` to nested `if` statements and C-style `for` loops to `while` loops.
@@ -152,7 +152,7 @@ Whitespace normalization must distinguish code from comments. It must not modify
 - TuringScript has one program-wide variable scope.
 - The developer is responsible for avoiding unintended interactions between program-wide variables used by different functions.
 
-The working lexical, source, constant-expression, and lean canonical grammars are maintained in `docs/turing-script-grammar.md`. Function and struct productions remain explicitly paused there.
+The working lexical, source, static-struct, constant-expression, and lean canonical grammars are maintained in `docs/turing-script-grammar.md`. Function productions remain explicitly paused there.
 
 ## 6. Numeric model and literals
 
@@ -325,44 +325,99 @@ Array(keyboard()) // precompiler error: runtime-dependent size
 
 ## 9. Static structs declared with `class`
 
-### Confirmed direction
+### Confirmed
 
-- Classes are allowed only as syntax for static structs.
-- Static structs cannot contain functions or methods.
-- Static structs must be completely removed by a precompiler so the core compiler does not implement them.
-- Compilation and generated names must remain deterministic.
-
-### Paused
-
-The exact declaration syntax, construction syntax, permitted fields, memory representation, field-access lowering, and flattened-name scheme will be redesigned after the non-struct language is settled. The following earlier example is non-normative and must not be implemented yet:
+Classes are compile-time schemas for statically allocated struct instances. They are not runtime class values. Class declarations, construction expressions, instance identifiers, and field access must be completely removed by precompilation; the core compiler has no struct support or struct metadata.
 
 ```js
-class Snake() {
-  speed, color, position_x
+class Player {
+  health = 100
+  inventory = Array(8)
+  position = [0, 0]
+  score = 0
 }
 
-let x = Snake(1, 0b0101, 33)
-let g = Snake(6, 0b0101, 93)
-x.speed = 99
-g.position_x = 3
+let player = Player(75, 500)
+
+player.inventory[2] = 50
+player.position[0]++
+player.score = player.health + 10
 ```
 
-Conceptually lowers to:
+Class declarations obey these rules:
+
+- A class declaration is allowed only at top level and must appear before its first construction.
+- A class body contains one field per line. Methods, constructors, getters, setters, static members, inheritance, and nested class declarations are prohibited.
+- Every field has an initializer and field names must be unique within their class.
+- A field initializer is either a scalar source expression, `Array(constantSize)`, or a nonempty array literal.
+- An empty class is prohibited.
+- A class name cannot be reused by another class, variable, array, instance, or reserved word.
+- Field defaults do not execute when the class schema is declared. They execute when control reaches an instance declaration.
+- `this`, `super`, field references inside defaults, and other runtime class behavior remain prohibited.
+
+An instance is created only as a variable declaration initializer:
 
 ```js
-let x_speed_aaaaaa = 1
-let x_color_aaaaaa = 0b0101
-let x_position_x_aaaaaa = 33
-
-let g_speed_bbbbbb = 6
-let g_color_bbbbbb = 0b0101
-let g_position_x_bbbbbb = 93
-
-x_speed_aaaaaa = 99
-g_position_x_bbbbbb = 3
+let first = Player(75, 500)
+const second = Player()
 ```
 
-The class syntax above is a possible TuringScript extension and is not claimed to be valid ECMAScript class syntax.
+- `let`, `const`, and `var` are accepted for an instance declaration, subject to their existing precompiler behavior.
+- Constructor arguments correspond only to scalar fields, in scalar-field declaration order. Array fields do not occupy constructor argument positions.
+- Each supplied scalar argument overrides the corresponding scalar default. Missing scalar arguments use their defaults. Supplying more arguments than scalar fields is an error.
+- Fields initialize in class declaration order. Each selected default or override expression is evaluated exactly once when execution reaches the instance declaration.
+- An instance declaration inside control flow owns permanent static storage, while its generated initializers execute whenever the declaration is reached, consistent with ordinary variables and arrays.
+- An instance identifier occupies no runtime pointer slot and cannot be reassigned, including when declared with `let` or `var`.
+- A `const` instance still permits scalar-field and array-element mutation, matching `const` array behavior.
+
+### Storage and lowering
+
+Each instance receives one generated backing array for all scalar fields and a separate generated backing array for every array field. Scalar offsets follow scalar-field declaration order. Every array field has the size defined by its class schema, and every instance receives independent storage for that field.
+
+Conceptually, the example above first lowers to ordinary source constructs like these:
+
+```js
+let __ts_struct_player_scalars_0 = Array(2)
+__ts_struct_player_scalars_0[0] = 75
+
+let __ts_struct_player_inventory_1 = Array(8)
+let __ts_struct_player_position_2 = [0, 0]
+
+__ts_struct_player_scalars_0[1] = 500
+
+__ts_struct_player_inventory_1[2] = 50
+__ts_struct_player_position_2[0]++
+__ts_struct_player_scalars_0[1] = __ts_struct_player_scalars_0[0] + 10
+```
+
+The exact generated names may differ, but they must begin with reserved `__ts_`, be deterministic, be collision-safe, and remain stable for identical input. Later existing precompilers lower the generated array literals, `.length`, `for...in`, postfix updates, compound assignments, constants, and other source conveniences.
+
+Separate backing arrays for array fields are normative. They allow the ordinary array validation and lowering stages to process each field without adding struct behavior to the core compiler. A struct array field is source-level grouping, not an array nested inside another array.
+
+### Field behavior
+
+- A scalar field may be read anywhere a scalar expression is accepted and may be targeted by ordinary assignment, arithmetic compound assignment, postfix increment, or postfix decrement.
+- An array field may be used only with indexing, `.length`, or either supported array `for...in` form.
+- Array-field indexes may be runtime expressions. Constant out-of-bounds indexes are precompiler errors; variable indexes receive no runtime bounds checks.
+- Array-field elements remain mutable for every instance declaration kind.
+- Array fields cannot be resized, reassigned, aliased, compared, returned, passed, or used as standalone values.
+- Instance identifiers cannot be assigned, copied, compared, returned, passed, or used as standalone values.
+- Unknown fields and dynamic field access such as `player[field]` are errors.
+- Arrays of structs, structs inside structs, and nested array fields are initially prohibited.
+- Repeatedly reaching an instance declaration follows the existing implementation-defined clearing behavior for each generated array. Programs must not depend on preserved or cleared contents.
+
+```js
+for (let index in player.inventory) {
+  output(player.inventory[index])
+}
+
+player.inventory = otherInventory // prohibited
+let alias = player                 // prohibited
+if (player == second) {            // prohibited
+}
+```
+
+The `ClassName(...)` construction syntax is a TuringScript precompiler construct. It does not enable ordinary function calls and does not require `new`.
 
 ## 10. Expressions and operators
 
@@ -519,7 +574,7 @@ let maximumS32 = Math.S32_MAX // 0x7fffffff
 - `break` and `continue` are supported and apply to the nearest enclosing loop.
 - Empty C-style `for` clauses, including `for (;;)`, are prohibited.
 - The two separators in a C-style `for` header are semicolons. This is the only source context in which semicolons are allowed.
-- Specialized `for (let identifier in array)` and `for (identifier in array)` loops are allowed. Both assign successive indexes from `0` through `array.length - 1`.
+- Specialized `for (let identifier in array)` and `for (identifier in array)` loops are allowed for ordinary arrays and struct array fields. Both assign successive indexes from `0` through `array.length - 1`.
 - The `let` form declares a program-wide index variable. The bare form reuses a previously declared scalar and resets it to `0` when reached.
 - Both array-loop forms are lowered by a precompiler to `while` loops.
 - `do`/`while`, `for`/`of`, `switch`, and labeled statements are prohibited.
@@ -568,7 +623,7 @@ Standalone block statements are prohibited because blocks do not create scope. B
 - The binary `in` operator is prohibited. The dedicated `for (let identifier in array)` and `for (identifier in array)` syntaxes are separate loop constructs.
 - `this`, `super`, and the implicit `arguments` object are prohibited.
 - `with`, `debugger`, `yield`, and `await` are prohibited.
-- Property access is prohibited except for `array.length` and the future static-struct syntax, which remains paused.
+- Property access is prohibited except for `array.length`, confirmed static-struct field access, and the existing `Math` precompiler namespace.
 - Numeric separators, octal literals, and exponential notation are prohibited.
 - Multiple declarations such as `let a = 1, b = 2` are prohibited.
 - Logical assignments `&&=`, `||=`, and `??=`, exponent assignment `**=`, and unsigned-shift assignment `>>>=` are unsupported.
@@ -708,7 +763,7 @@ The output must use only features understood by the next registered step. The fi
 
 - Declarations use `let`, never `const` or `var`.
 - Boolean values have become `0` or `1`.
-- Static classes and instances have been flattened into scalar variables.
+- Static classes and instances have become generated scalar-backing and array-field arrays, and all struct property access has been replaced.
 - Array literals have become `Array(size)` plus indexed assignments.
 - Array sizes have been resolved, array rules have been validated, and `.length` has become a constant.
 - `else if` has become nested `if`.
@@ -727,11 +782,11 @@ A precompiler may itself tokenize or parse source internally. Its public boundar
 
 ### Open now
 
-No non-function, non-struct language decisions are currently open. Implementation-defined array redeclaration behavior remains the programmer's responsibility.
+No non-function language decisions are currently open. Implementation-defined repeated array and struct-instance initialization behavior remains the programmer's responsibility.
 
 ### Paused
 
-All static-struct representation decisions listed in section 9 and all function ABI, recursion, nested-function, stack-frame, entry-point, and bare-return decisions listed in section 13.
+All function ABI, recursion, nested-function, stack-frame, entry-point, and bare-return decisions listed in section 13.
 
 ## 19. Conformance examples
 
