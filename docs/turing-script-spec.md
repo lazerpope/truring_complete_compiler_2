@@ -47,11 +47,7 @@ interface PipelineDebugState {
   results: PipelineDebugResult[]
 }
 
-type PrecompilerPipeline = [
-  code: string,
-  error: PipelineErrorState,
-  debug: PipelineDebugState,
-]
+type PrecompilerPipeline = [code: string, error: PipelineErrorState, debug: PipelineDebugState]
 
 type CompilerResult = PrecompilerPipeline
 type CompilerStep = (pipeline: PrecompilerPipeline) => CompilerResult
@@ -228,10 +224,10 @@ The precompiler emits equivalent core TuringScript statements rather than making
 Example allocation:
 
 ```js
-let counter = 0        // bytes 0 through 3
-const limit = 10       // bytes 4 through 7
+let counter = 0 // bytes 0 through 3
+const limit = 10 // bytes 4 through 7
 let values = Array(10) // elements at bytes 8 through 47
-const snake = 102      // bytes 48 through 51
+const snake = 102 // bytes 48 through 51
 ```
 
 ## 8. Static arrays
@@ -415,8 +411,9 @@ for (let index in player.inventory) {
 }
 
 player.inventory = otherInventory // prohibited
-let alias = player                 // prohibited
-if (player == second) {            // prohibited
+let alias = player // prohibited
+if (player == second) {
+  // prohibited
 }
 ```
 
@@ -428,21 +425,21 @@ The `ClassName(...)` construction syntax is a TuringScript precompiler construct
 
 Listed from highest to lowest precedence:
 
-| Operators | Meaning |
-| --- | --- |
-| `()` | Grouping |
-| `!`, `~`, unary `-` | Unary operations |
-| `*`, `/`, `%` | Multiplication, division, modulo |
-| `+`, `-` | Addition and subtraction |
-| `<<`, `>>`, `s>>` | Left shift, unsigned right shift, signed right shift |
-| `<`, `<=`, `>`, `>=`, `s<`, `s<=`, `s>`, `s>=` | Unsigned and signed relational comparisons |
-| `==`, `!=`, `===`, `!==` | Equality and inequality |
-| `&` | Bitwise AND |
-| `^` | Bitwise XOR |
-| `|` | Bitwise OR |
-| `&&` | Logical AND with short-circuiting |
-| `||` | Logical OR with short-circuiting |
-| `=`, `+=`, `-=`, `*=`, `/=`, `%=` | Assignment |
+| Operators                                      | Meaning                                              |
+| ---------------------------------------------- | ---------------------------------------------------- |
+| `()`                                           | Grouping                                             |
+| `!`, `~`, unary `-`                            | Unary operations                                     |
+| `*`, `/`, `%`                                  | Multiplication, division, modulo                     |
+| `+`, `-`                                       | Addition and subtraction                             |
+| `<<`, `>>`, `s>>`                              | Left shift, unsigned right shift, signed right shift |
+| `<`, `<=`, `>`, `>=`, `s<`, `s<=`, `s>`, `s>=` | Unsigned and signed relational comparisons           |
+| `==`, `!=`, `===`, `!==`                       | Equality and inequality                              |
+| `&`                                            | Bitwise AND                                          |
+| `^`                                            | Bitwise XOR                                          |
+| `                                              | `                                                    | Bitwise OR |
+| `&&`                                           | Logical AND with short-circuiting                    |
+| `                                              |                                                      | `          | Logical OR with short-circuiting |
+| `=`, `+=`, `-=`, `*=`, `/=`, `%=`              | Assignment                                           |
 
 The signed operators must be written as contiguous tokens.
 
@@ -458,18 +455,18 @@ The signed operators must be written as contiguous tokens.
 - Logical NOT `!value` produces `1` when `value` is zero and `0` otherwise.
 - The special `Math` namespace described below provides compiler-recognized precompiler helpers. It is not an object or runtime module.
 
-| TuringScript | Target behavior |
-| --- | --- |
-| `a >> b` | `lsr`: unsigned/logical right shift |
-| `a s>> b` | `asr`: signed/arithmetic right shift |
-| `a < b` | `cmp` followed by unsigned `jb` behavior |
-| `a <= b` | `cmp` followed by unsigned `jbe` behavior |
-| `a > b` | `cmp` followed by unsigned `ja` behavior |
-| `a >= b` | `cmp` followed by unsigned `jae` behavior |
-| `a s< b` | `cmp` followed by signed `jl` behavior |
-| `a s<= b` | `cmp` followed by signed `jle` behavior |
-| `a s> b` | `cmp` followed by signed `jg` behavior |
-| `a s>= b` | `cmp` followed by signed `jge` behavior |
+| TuringScript | Target behavior                           |
+| ------------ | ----------------------------------------- |
+| `a >> b`     | `lsr`: unsigned/logical right shift       |
+| `a s>> b`    | `asr`: signed/arithmetic right shift      |
+| `a < b`      | `cmp` followed by unsigned `jb` behavior  |
+| `a <= b`     | `cmp` followed by unsigned `jbe` behavior |
+| `a > b`      | `cmp` followed by unsigned `ja` behavior  |
+| `a >= b`     | `cmp` followed by unsigned `jae` behavior |
+| `a s< b`     | `cmp` followed by signed `jl` behavior    |
+| `a s<= b`    | `cmp` followed by signed `jle` behavior   |
+| `a s> b`     | `cmp` followed by signed `jg` behavior    |
+| `a s>= b`    | `cmp` followed by signed `jge` behavior   |
 
 Loose and strict equality are both supported and have identical behavior because TuringScript has one machine-word datatype. Equality does not need signed variants because signedness does not change whether two bit patterns are equal.
 
@@ -485,18 +482,18 @@ Division by zero produces `0`. Modulo `A` by zero produces `A`. These are target
 
 Comparison expressions may be assigned to variables and always produce exactly `0` or `1`. The compiler extracts and combines the flag bits directly:
 
-| Expression | Boolean value derived from `flags` |
-| --- | --- |
-| `a == b` or `a === b` | bit 0 |
-| `a != b` or `a !== b` | bit 0 XOR `1` |
-| `a < b` | bit 1 |
-| `a <= b` | bit 0 OR bit 1 |
-| `a > b` | (bit 0 OR bit 1) XOR `1` |
-| `a >= b` | bit 1 XOR `1` |
-| `a s< b` | bit 2 |
-| `a s<= b` | bit 0 OR bit 2 |
-| `a s> b` | (bit 0 OR bit 2) XOR `1` |
-| `a s>= b` | bit 2 XOR `1` |
+| Expression            | Boolean value derived from `flags` |
+| --------------------- | ---------------------------------- |
+| `a == b` or `a === b` | bit 0                              |
+| `a != b` or `a !== b` | bit 0 XOR `1`                      |
+| `a < b`               | bit 1                              |
+| `a <= b`              | bit 0 OR bit 1                     |
+| `a > b`               | (bit 0 OR bit 1) XOR `1`           |
+| `a >= b`              | bit 1 XOR `1`                      |
+| `a s< b`              | bit 2                              |
+| `a s<= b`             | bit 0 OR bit 2                     |
+| `a s> b`              | (bit 0 OR bit 2) XOR `1`           |
+| `a s>= b`             | bit 2 XOR `1`                      |
 
 When a comparison is used directly as a condition, the compiler may use the matching conditional jump without first storing its Boolean value.
 
@@ -543,11 +540,11 @@ Prefix `++value`, prefix `--value`, and the conditional expression `condition ? 
 The supported members are:
 
 ```js
-let smaller = Math.min(a, b)       // unsigned comparison
-let larger = Math.max(a, b)        // unsigned comparison
+let smaller = Math.min(a, b) // unsigned comparison
+let larger = Math.max(a, b) // unsigned comparison
 let signedSmaller = Math.smin(a, b) // signed comparison
-let signedLarger = Math.smax(a, b)  // signed comparison
-let magnitude = Math.abs(value)     // signed interpretation
+let signedLarger = Math.smax(a, b) // signed comparison
+let magnitude = Math.abs(value) // signed interpretation
 
 let maximumU16 = Math.U16_MAX // 0xffff
 let maximumS16 = Math.S16_MAX // 0x7fff
@@ -592,7 +589,6 @@ if (condition) {
 while (condition) {
   action()
 }
-
 ```
 
 ```js
@@ -789,12 +785,12 @@ Finally, the compiler appends exactly one framebuffer region:
 
 ```asm
 framebuffer:
-@0x2000
+@0x6000
 ```
 
-`@0x2000` pads memory with zero bytes up to absolute byte address `0x2000`; it is not an instruction. The compiler calculates the final address of `framebuffer` and reports an error unless `framebufferAddress + framebufferByteCount <= 0x2000`. At resolution setting `19`, the framebuffer must begin at or before address `0x0D40` (`8192 - 4800`). Capacity uses emitted instruction byte sizes, not source-line counts.
+`@0x6000` pads memory with zero bytes up to absolute byte address `0x6000`; it is not an instruction. The compiler calculates the final address of `framebuffer` and reports an error unless `framebufferAddress + framebufferByteCount <= 0x6000`. At resolution setting `19`, the framebuffer must begin at or before address `0x0D40` (`8192 - 4800`). Capacity uses emitted instruction byte sizes, not source-line counts.
 
-Although the hardware resolution setting permits `0..255`, the fixed `@0x2000` boundary means settings above `25` can never fit even with an empty program. Smaller settings can still fail when the generated program occupies too much space before `framebuffer`. Validation rejects an impossible setting early, while the compiler always performs the final capacity check.
+Although the hardware resolution setting permits `0..255`, the fixed `@0x6000` boundary means settings above `25` can never fit even with an empty program. Smaller settings can still fail when the generated program occupies too much space before `framebuffer`. Validation rejects an impossible setting early, while the compiler always performs the final capacity check.
 
 The compiler does not append a halt or jump. The programmer must prevent execution from falling through into appended data when necessary.
 
@@ -821,7 +817,7 @@ Precompilers are responsible for source conveniences that can be represented in 
 
 Source labels, `goto`, inline assembly, raw Symphony instructions, and other low-level escape hatches are prohibited.
 
-When Screen8 is present, the compiler appends the `framebuffer` label and `@0x2000` reservation and validates that the selected framebuffer fits below byte address `0x2000`. Compiler-generated `store_8` is permitted for this framebuffer even though direct source use remains prohibited.
+When Screen8 is present, the compiler appends the `framebuffer` label and `@0x6000` reservation and validates that the selected framebuffer fits below byte address `0x6000`. Compiler-generated `store_8` is permitted for this framebuffer even though direct source use remains prohibited.
 
 The compiler appends no halt instruction or terminal loop. Ending execution safely is the programmer's responsibility. A program that must stop progressing can explicitly end in a suitable loop.
 

@@ -217,7 +217,7 @@ Semantic rules:
 
 - Exactly one declaration is allowed, at top level and before all pixel writes.
 - The resolution setting resolves at precompile time to `0..255`.
-- With the fixed framebuffer ending at `0x2000`, settings above `25` are always invalid; final capacity depends on compiled program size and is checked by the compiler.
+- With the fixed framebuffer ending at `0x6000`, settings above `25` are always invalid; final capacity depends on compiled program size and is checked by the compiler.
 - The first index is zero-based `x`; the second is zero-based `y`.
 - Width is `4 * (setting + 1)` and height is `3 * (setting + 1)`.
 - The byte offset is `y * width + x`.
@@ -452,10 +452,10 @@ The compiler emits real `screen`, address arithmetic, and `store_8` instructions
 
 ```asm
 framebuffer:
-@0x2000
+@0x6000
 ```
 
-The final framebuffer must fit entirely below absolute byte address `0x2000`.
+The final framebuffer must fit entirely below absolute byte address `0x6000`.
 
 ## 12. Program completion
 

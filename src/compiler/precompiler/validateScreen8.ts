@@ -42,7 +42,7 @@ export function doStep(pipeline: PrecompilerPipeline): PrecompilerPipeline {
           width = 4n * (setting + 1n)
           height = 3n * (setting + 1n)
           if (setting > 25n) {
-            reasons.push(`Line ${line.lineNumber}: Screen8 resolution ${setting} cannot fit before 0x2000`)
+            reasons.push(`Line ${line.lineNumber}: Screen8 resolution ${setting} cannot fit before 0x6000`)
           }
         }
       }

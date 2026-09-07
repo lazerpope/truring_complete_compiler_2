@@ -86,13 +86,13 @@ class AssemblyCompiler {
         const trimmed = line.trim()
         return trimmed !== '' && !trimmed.startsWith('#') && !trimmed.endsWith(':')
       }).length * 4
-      if (programByteCount + this.framebufferByteCount > 0x2000) {
+      if (programByteCount + this.framebufferByteCount > 0x6000) {
         throw this.error(
           this.framebufferLocation!,
-          `Program (${programByteCount} bytes) and Screen8 framebuffer (${this.framebufferByteCount} bytes) exceed 0x2000`,
+          `Program (${programByteCount} bytes) and Screen8 framebuffer (${this.framebufferByteCount} bytes) exceed 0x6000`,
         )
       }
-      this.lines.push('', '_pre_framebuffer_label:', 'jmp _pre_framebuffer_label', 'framebuffer:', '@0x2000')
+      this.lines.push('', '_pre_framebuffer_label:', 'jmp _pre_framebuffer_label', 'framebuffer:', '@0x6000')
     }
     return this.lines.join('\n')
   }

@@ -75,39 +75,39 @@ It does not also lower booleans, rewrite declarations, or format whitespace.
 
 All listed stages are implemented and registration order must match this table.
 
-| Order | Stage/file | Status | Single responsibility |
-| ---: | --- | --- | --- |
-| 01 | `normalizeLineEndings.ts` | Implemented | Convert CRLF and CR to LF. |
-| 02 | `removeWhitespaces.ts` | Implemented | Collapse unnecessary code whitespace while preserving blank lines and exact comment contents. |
-| 03 | `validateSemicolons.ts` | Implemented | Reject semicolons except the two delimiters in a C-style `for` header. |
-| 04 | `validateIdentifiers.ts` | Implemented | Enforce identifier syntax, case rules, reserved names, duplicates, and the reserved `__ts_` prefix. |
-| 05 | `validateStaticStructs.ts` | Implemented | Validate class schemas, fields, construction, access, scalar arguments, array-field rules, and all prohibited struct-as-value behavior. |
-| 06 | `lowerStaticStructs.ts` | Implemented | Remove class schemas and instances by emitting deterministic scalar backing arrays and separate array-field arrays, then rewrite every valid field use. |
-| 07 | `validateUnsupportedSyntax.ts` | Implemented | Reject prohibited JavaScript and low-level escape-hatch syntax after confirmed struct syntax has been removed. |
-| 08 | `collapseEquality.ts` | Implemented | Convert `===` to `==` and `!==` to `!=` outside comments. |
-| 09 | `lowerBooleanLiterals.ts` | Implemented | Convert `true` to `1` and `false` to `0`. |
-| 10 | `lowerNullishLiterals.ts` | Implemented | Convert `null` and `undefined` to `0`. |
-| 11 | `validateConstAssignments.ts` | Implemented | Record `const` bindings and reject later reassignment while leaving declarations intact for constant evaluation. |
-| 12 | `lowerMathConstants.ts` | Implemented | Replace `Math.U16_MAX`, `Math.S16_MAX`, `Math.U32_MAX`, `Math.S32_MIN`, and `Math.S32_MAX` with their U32 values. |
-| 13 | `foldConstantExpressions.ts` | Implemented | Resolve known `const` names, evaluate required constant expressions, and partially fold literal `+`, `-`, `*`, and `/` subexpressions without treating mutable variables as constants. |
-| 14 | `validateScreen8.ts` | Implemented | Validate the single fixed Screen8 declaration, constant resolution, write-only `[x][y]` access, bounds known at precompile time, and prohibited screen-as-value behavior. |
-| 15 | `lowerScreen8.ts` | Implemented | Lower Screen8 initialization into three canonical `screen` calls and pixel writes into deterministic generated temporaries plus compiler-private `__ts_screen8_store` operations. |
-| 16 | `validateArrayRules.ts` | Implemented | Collect ordinary and struct-generated array metadata and reject zero sizes, runtime sizes, nested arrays, aliasing, reassignment, comparison, passing, and other invalid array use. |
-| 17 | `lowerArrayLiterals.ts` | Implemented | Expand ordinary and struct-generated array literals into `Array(size)` plus ordered indexed assignments; holes become zero and a trailing comma is ignored. |
-| 18 | `replaceArrayLengths.ts` | Implemented | Replace each valid ordinary or struct-generated `array.length` with its known constant size. |
-| 19 | `validateConstantArrayBounds.ts` | Implemented | Reject every precompiler-known out-of-bounds index, including struct array fields after lowering; leave runtime indexes unchecked. |
-| 20 | `lowerArrayForLoops.ts` | Implemented | Convert declaring `for (let index in array)` and reuse-form `for (index in array)` loops to `while`, including struct array fields after lowering and correct `continue` behavior. |
-| 21 | `lowerCStyleForLoops.ts` | Implemented | Convert C-style `for` to `while`, moving its update into the body and every applicable `continue` path. |
-| 22 | `lowerElseIf.ts` | Implemented | Convert `else if` into an `if` nested in an `else` block. |
-| 23 | `lowerPostfixUpdates.ts` | Implemented | Convert statement-form `target++` and `target--` into ordinary assignments while evaluating array indexes once. |
-| 24 | `lowerCompoundAssignments.ts` | Implemented | Convert `+=`, `-=`, `*=`, `/=`, and `%=` into ordinary assignments while evaluating targets once. |
-| 25 | `lowerMathCalls.ts` | Implemented | Expand runtime `Math.min`, `max`, `smin`, `smax`, and `abs` after loop lowering, with once-only left-to-right and short-circuit-safe evaluation. |
-| 26 | `lowerNestedHardwareReads.ts` | Implemented | Extract nested value-producing hardware calls into deterministic temporaries without changing left-to-right or short-circuit behavior. |
-| 27 | `lowerLargeConstants.ts` | Implemented | Replace U32 expression literals above U16 with high/low U16 construction statements. Allocation-size metadata is not rewritten. |
-| 28 | `lowerConstDeclarations.ts` | Implemented | Convert validated `const` declarations to `let`. |
-| 29 | `lowerVarDeclarations.ts` | Implemented | Convert `var` declarations to `let` without JavaScript hoisting. |
-| 30 | `validateCanonicalSource.ts` | Implemented | Parse the final text against the canonical grammar and report anything that an earlier stage failed to remove. |
-| 31 | `formatCanonicalSource.ts` | Implemented | Apply deterministic final formatting without modifying comment contents. |
+| Order | Stage/file                       | Status      | Single responsibility                                                                                                                                                                  |
+| ----: | -------------------------------- | ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+|    01 | `normalizeLineEndings.ts`        | Implemented | Convert CRLF and CR to LF.                                                                                                                                                             |
+|    02 | `removeWhitespaces.ts`           | Implemented | Collapse unnecessary code whitespace while preserving blank lines and exact comment contents.                                                                                          |
+|    03 | `validateSemicolons.ts`          | Implemented | Reject semicolons except the two delimiters in a C-style `for` header.                                                                                                                 |
+|    04 | `validateIdentifiers.ts`         | Implemented | Enforce identifier syntax, case rules, reserved names, duplicates, and the reserved `__ts_` prefix.                                                                                    |
+|    05 | `validateStaticStructs.ts`       | Implemented | Validate class schemas, fields, construction, access, scalar arguments, array-field rules, and all prohibited struct-as-value behavior.                                                |
+|    06 | `lowerStaticStructs.ts`          | Implemented | Remove class schemas and instances by emitting deterministic scalar backing arrays and separate array-field arrays, then rewrite every valid field use.                                |
+|    07 | `validateUnsupportedSyntax.ts`   | Implemented | Reject prohibited JavaScript and low-level escape-hatch syntax after confirmed struct syntax has been removed.                                                                         |
+|    08 | `collapseEquality.ts`            | Implemented | Convert `===` to `==` and `!==` to `!=` outside comments.                                                                                                                              |
+|    09 | `lowerBooleanLiterals.ts`        | Implemented | Convert `true` to `1` and `false` to `0`.                                                                                                                                              |
+|    10 | `lowerNullishLiterals.ts`        | Implemented | Convert `null` and `undefined` to `0`.                                                                                                                                                 |
+|    11 | `validateConstAssignments.ts`    | Implemented | Record `const` bindings and reject later reassignment while leaving declarations intact for constant evaluation.                                                                       |
+|    12 | `lowerMathConstants.ts`          | Implemented | Replace `Math.U16_MAX`, `Math.S16_MAX`, `Math.U32_MAX`, `Math.S32_MIN`, and `Math.S32_MAX` with their U32 values.                                                                      |
+|    13 | `foldConstantExpressions.ts`     | Implemented | Resolve known `const` names, evaluate required constant expressions, and partially fold literal `+`, `-`, `*`, and `/` subexpressions without treating mutable variables as constants. |
+|    14 | `validateScreen8.ts`             | Implemented | Validate the single fixed Screen8 declaration, constant resolution, write-only `[x][y]` access, bounds known at precompile time, and prohibited screen-as-value behavior.              |
+|    15 | `lowerScreen8.ts`                | Implemented | Lower Screen8 initialization into three canonical `screen` calls and pixel writes into deterministic generated temporaries plus compiler-private `__ts_screen8_store` operations.      |
+|    16 | `validateArrayRules.ts`          | Implemented | Collect ordinary and struct-generated array metadata and reject zero sizes, runtime sizes, nested arrays, aliasing, reassignment, comparison, passing, and other invalid array use.    |
+|    17 | `lowerArrayLiterals.ts`          | Implemented | Expand ordinary and struct-generated array literals into `Array(size)` plus ordered indexed assignments; holes become zero and a trailing comma is ignored.                            |
+|    18 | `replaceArrayLengths.ts`         | Implemented | Replace each valid ordinary or struct-generated `array.length` with its known constant size.                                                                                           |
+|    19 | `validateConstantArrayBounds.ts` | Implemented | Reject every precompiler-known out-of-bounds index, including struct array fields after lowering; leave runtime indexes unchecked.                                                     |
+|    20 | `lowerArrayForLoops.ts`          | Implemented | Convert declaring `for (let index in array)` and reuse-form `for (index in array)` loops to `while`, including struct array fields after lowering and correct `continue` behavior.     |
+|    21 | `lowerCStyleForLoops.ts`         | Implemented | Convert C-style `for` to `while`, moving its update into the body and every applicable `continue` path.                                                                                |
+|    22 | `lowerElseIf.ts`                 | Implemented | Convert `else if` into an `if` nested in an `else` block.                                                                                                                              |
+|    23 | `lowerPostfixUpdates.ts`         | Implemented | Convert statement-form `target++` and `target--` into ordinary assignments while evaluating array indexes once.                                                                        |
+|    24 | `lowerCompoundAssignments.ts`    | Implemented | Convert `+=`, `-=`, `*=`, `/=`, and `%=` into ordinary assignments while evaluating targets once.                                                                                      |
+|    25 | `lowerMathCalls.ts`              | Implemented | Expand runtime `Math.min`, `max`, `smin`, `smax`, and `abs` after loop lowering, with once-only left-to-right and short-circuit-safe evaluation.                                       |
+|    26 | `lowerNestedHardwareReads.ts`    | Implemented | Extract nested value-producing hardware calls into deterministic temporaries without changing left-to-right or short-circuit behavior.                                                 |
+|    27 | `lowerLargeConstants.ts`         | Implemented | Replace U32 expression literals above U16 with high/low U16 construction statements. Allocation-size metadata is not rewritten.                                                        |
+|    28 | `lowerConstDeclarations.ts`      | Implemented | Convert validated `const` declarations to `let`.                                                                                                                                       |
+|    29 | `lowerVarDeclarations.ts`        | Implemented | Convert `var` declarations to `let` without JavaScript hoisting.                                                                                                                       |
+|    30 | `validateCanonicalSource.ts`     | Implemented | Parse the final text against the canonical grammar and report anything that an earlier stage failed to remove.                                                                         |
+|    31 | `formatCanonicalSource.ts`       | Implemented | Apply deterministic final formatting without modifying comment contents.                                                                                                               |
 
 Static structs and Screen8 are implemented. Function stages remain paused and intentionally absent from this order.
 
@@ -142,8 +142,8 @@ For Screen8, `compileCanonical` has four responsibilities:
 
 1. Compile the three generated canonical `screen` calls, resolving the private framebuffer operand to the `framebuffer` label.
 2. Expand each private pixel-store pseudo-operation into framebuffer address addition plus `store_8`.
-3. Calculate the final assembly byte offset and reject a framebuffer that would extend past absolute address `0x2000`.
-4. Append exactly one `framebuffer:` label followed by `@0x2000`.
+3. Calculate the final assembly byte offset and reject a framebuffer that would extend past absolute address `0x6000`.
+4. Append exactly one `framebuffer:` label followed by `@0x6000`.
 
 The compiler accepts these private operations only after the trusted precompiler stages. User source cannot spell them because identifiers beginning with `__ts_`, labels, inline assembly, and raw memory operations are rejected before lowering.
 
