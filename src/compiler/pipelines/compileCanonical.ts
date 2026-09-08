@@ -57,8 +57,13 @@ const COMPARISON_JUMPS: Partial<Record<BinaryOperator, string>> = {
 
 const isComparison = (operator: BinaryOperator): boolean => operator in COMPARISON_JUMPS
 
-const FRAMEBUFFER_END = 0x8000
 const SCREEN8_DRAW_REGISTER = 'r13'
+const FRAMEBUFFER_0_HIGH = '__ts_framebuffer_0_high'
+const FRAMEBUFFER_0_LOW = '__ts_framebuffer_0_low'
+const FRAMEBUFFER_1_HIGH = '__ts_framebuffer_1_high'
+const FRAMEBUFFER_1_LOW = '__ts_framebuffer_1_low'
+const FRAMEBUFFER_TOGGLE_HIGH = '__ts_framebuffer_toggle_high'
+const FRAMEBUFFER_TOGGLE_LOW = '__ts_framebuffer_toggle_low'
 
 export function doStep(pipeline: PrecompilerPipeline): PrecompilerPipeline {
   return runCompilerTransform(pipeline, (source) => {
@@ -76,7 +81,6 @@ class AssemblyCompiler {
   private labelCounter = 0
   private nextAddress = 0
   private framebufferByteCount: number | undefined
-  private framebufferLocation: SourceLocation | undefined
 
   constructor(private readonly program: Program) {
     this.allocateStatements(program.statements)
@@ -89,30 +93,19 @@ class AssemblyCompiler {
         const trimmed = line.trim()
         return trimmed !== '' && !trimmed.startsWith('#') && !trimmed.endsWith(':')
       }).length * 4
-      const framebuffer0Address = FRAMEBUFFER_END - this.framebufferByteCount * 2
-      const framebuffer1Address = FRAMEBUFFER_END - this.framebufferByteCount
-      if (framebuffer0Address < 0) {
-        throw this.error(
-          this.framebufferLocation!,
-          `Two Screen8 framebuffers (${this.framebufferByteCount} bytes each) exceed 0x8000`,
-        )
-      }
       const guardByteCount = 4
-      if (programByteCount + guardByteCount > framebuffer0Address) {
-        throw this.error(
-          this.framebufferLocation!,
-          `Program (${programByteCount} bytes), guard, and two Screen8 framebuffers (${this.framebufferByteCount} bytes each) exceed 0x8000`,
-        )
-      }
+      const framebuffer0Address = programByteCount + guardByteCount
+      const framebuffer1Address = framebuffer0Address + this.framebufferByteCount
+      const framebufferEndAddress = framebuffer1Address + this.framebufferByteCount
+      this.resolveFramebufferAddresses(framebuffer0Address, framebuffer1Address)
       this.lines.push(
         '',
         '_pre_framebuffer_label:',
         'jmp _pre_framebuffer_label',
-        `@0x${framebuffer0Address.toString(16)}`,
         'framebuffer_0:',
         `@0x${framebuffer1Address.toString(16)}`,
         'framebuffer_1:',
-        '@0x8000',
+        `@0x${framebufferEndAddress.toString(16)}`,
       )
     }
     return this.lines.join('\n')
@@ -256,14 +249,13 @@ class AssemblyCompiler {
         throw this.error(location, 'Conflicting generated Screen8 framebuffer sizes')
       }
       this.framebufferByteCount = valueExpression.byteCount
-      this.framebufferLocation = valueExpression.location
       this.registers.reserve(SCREEN8_DRAW_REGISTER, valueExpression.location)
       const value = this.registers.acquire(valueExpression.location)
-      this.emit(`add ${value}, zr, framebuffer_0`)
+      this.emitFramebufferAddress(value, 0)
       this.emit(`screen ${setting}, ${value}`)
       this.registers.release(value)
       this.registers.release(setting)
-      this.emit(`add ${SCREEN8_DRAW_REGISTER}, zr, framebuffer_1`)
+      this.emitFramebufferAddress(SCREEN8_DRAW_REGISTER, 1)
       return
     }
     if (valueExpression.type === 'literal' && valueExpression.value <= 0xffff) {
@@ -307,10 +299,10 @@ class AssemblyCompiler {
     this.emit(`screen ${setting}, ${SCREEN8_DRAW_REGISTER}`)
     this.registers.release(setting)
 
-    const framebuffer0Address = FRAMEBUFFER_END - this.framebufferByteCount * 2
-    const framebuffer1Address = FRAMEBUFFER_END - this.framebufferByteCount
-    const bufferToggleMask = framebuffer0Address ^ framebuffer1Address
-    this.emit(`xor ${SCREEN8_DRAW_REGISTER}, ${SCREEN8_DRAW_REGISTER}, ${bufferToggleMask}`)
+    const toggleMask = this.registers.acquire(location)
+    this.emitFramebufferToggleMask(toggleMask)
+    this.emit(`xor ${SCREEN8_DRAW_REGISTER}, ${SCREEN8_DRAW_REGISTER}, ${toggleMask}`)
+    this.registers.release(toggleMask)
     this.emit(`and ${color}, ${color}, 255`)
 
     const shifted = this.registers.acquire(location)
@@ -325,7 +317,8 @@ class AssemblyCompiler {
     const address = this.registers.acquire(location)
     const endAddress = this.registers.acquire(location)
     this.emit(`mov ${address}, ${SCREEN8_DRAW_REGISTER}`)
-    this.emit(`add ${endAddress}, ${SCREEN8_DRAW_REGISTER}, ${this.framebufferByteCount}`)
+    this.emitImmediate(endAddress, this.framebufferByteCount)
+    this.emit(`add ${endAddress}, ${SCREEN8_DRAW_REGISTER}, ${endAddress}`)
     const clearLabel = this.label('screen8_clear')
     this.emitLabel(clearLabel)
     this.emit(`store_32 [${address}], ${color}`)
@@ -568,6 +561,38 @@ class AssemblyCompiler {
     this.emit(`mov ${register}, ${high}`)
     this.emit(`lsl ${register}, ${register}, 16`)
     if (low !== 0) this.emit(`or ${register}, ${register}, ${low}`)
+  }
+
+  private emitFramebufferAddress(register: string, index: 0 | 1): void {
+    const high = index === 0 ? FRAMEBUFFER_0_HIGH : FRAMEBUFFER_1_HIGH
+    const low = index === 0 ? FRAMEBUFFER_0_LOW : FRAMEBUFFER_1_LOW
+    this.emit(`mov ${register}, ${high}`)
+    this.emit(`lsl ${register}, ${register}, 16`)
+    this.emit(`or ${register}, ${register}, ${low}`)
+  }
+
+  private emitFramebufferToggleMask(register: string): void {
+    this.emit(`mov ${register}, ${FRAMEBUFFER_TOGGLE_HIGH}`)
+    this.emit(`lsl ${register}, ${register}, 16`)
+    this.emit(`or ${register}, ${register}, ${FRAMEBUFFER_TOGGLE_LOW}`)
+  }
+
+  private resolveFramebufferAddresses(framebuffer0Address: number, framebuffer1Address: number): void {
+    const toggleMask = framebuffer0Address ^ framebuffer1Address
+    const replacements = new Map<string, number>([
+      [FRAMEBUFFER_0_HIGH, Math.floor(framebuffer0Address / 0x10000)],
+      [FRAMEBUFFER_0_LOW, framebuffer0Address & 0xffff],
+      [FRAMEBUFFER_1_HIGH, Math.floor(framebuffer1Address / 0x10000)],
+      [FRAMEBUFFER_1_LOW, framebuffer1Address & 0xffff],
+      [FRAMEBUFFER_TOGGLE_HIGH, Math.floor(toggleMask / 0x10000)],
+      [FRAMEBUFFER_TOGGLE_LOW, toggleMask & 0xffff],
+    ])
+
+    for (let index = 0; index < this.lines.length; index += 1) {
+      let line = this.lines[index]!
+      for (const [placeholder, value] of replacements) line = line.replaceAll(placeholder, String(value))
+      this.lines[index] = line
+    }
   }
 
   private inverseJump(operator: BinaryOperator): string {

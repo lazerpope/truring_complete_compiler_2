@@ -143,8 +143,8 @@ For Screen8, `compileCanonical` has five responsibilities:
 1. Compile initialization so `framebuffer_0` is displayed and reserved register `r13` points at hidden `framebuffer_1`.
 2. Expand each private pixel-store pseudo-operation into `r13`-relative address addition plus `store_8`.
 3. Expand each private present pseudo-operation into a screen-offset update, an `r13` buffer toggle, and a hidden-buffer color clear.
-4. Reject generated code that overlaps the two framebuffers ending at absolute address `0x8000`.
-5. Append two equal framebuffer regions immediately before `@0x8000`.
+4. Calculate both framebuffer addresses from the final emitted program size and selected resolution.
+5. Append two equal framebuffer regions immediately after the terminal guard jump.
 
 The compiler accepts these private operations only after the trusted precompiler stages. User source cannot spell them because identifiers beginning with `__ts_`, labels, inline assembly, and raw memory operations are rejected before lowering.
 

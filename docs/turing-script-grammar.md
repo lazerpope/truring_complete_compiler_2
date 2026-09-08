@@ -219,7 +219,7 @@ Semantic rules:
 
 - Exactly one declaration is allowed, at top level and before all pixel writes and presentations.
 - The resolution setting resolves at precompile time to `0..255`.
-- Two equal framebuffers are reserved immediately before absolute address `0x8000`; settings above `25` remain invalid.
+- Two equal framebuffers are sized from the selected resolution and reserved immediately after the generated terminal guard jump.
 - The first index is zero-based `x`; the second is zero-based `y`.
 - Width is `4 * (setting + 1)` and height is `3 * (setting + 1)`.
 - The byte offset is `y * width + x`.
@@ -458,18 +458,19 @@ __ts_screen8_present(ColorExpression)
 The compiler emits real `screen`, address arithmetic, `store_8`, and hidden-buffer `store_32` clear instructions, then appends two buffers:
 
 ```asm
-@framebuffer_0_address
+_pre_framebuffer_label:
+jmp _pre_framebuffer_label
 framebuffer_0:
 @framebuffer_1_address
 framebuffer_1:
-@0x8000
+@framebuffer_end_address
 ```
 
-Generated code plus the guard jump must end before `framebuffer_0`, and both buffers end at `0x8000`.
+`framebuffer_0` begins directly after the guard jump. The second buffer and final end address are derived from the selected Screen8 byte count.
 
 ## 12. Program completion
 
-The grammar does not require a terminal statement. The compiler appends neither a halt instruction nor a loop. Safe termination and any final infinite loop are the programmer's responsibility.
+The grammar does not require a terminal statement. Screen8 output receives a compiler-generated self-jump before its framebuffer storage; other programs receive neither a halt instruction nor a loop.
 
 ## 13. Deliberate exclusions and implementation-defined behavior
 

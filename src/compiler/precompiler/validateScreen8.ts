@@ -42,11 +42,6 @@ export function doStep(pipeline: PrecompilerPipeline): PrecompilerPipeline {
         } else {
           width = 4n * (setting + 1n)
           height = 3n * (setting + 1n)
-          if (setting > 25n) {
-            reasons.push(
-              `Line ${line.lineNumber}: Screen8 resolution ${setting} exceeds the supported double-buffer limit`,
-            )
-          }
         }
       }
     } else if (/\bScreen8\b/.test(code)) {

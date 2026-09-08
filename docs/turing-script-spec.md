@@ -764,7 +764,7 @@ __ts_screen8_store(__ts_screen8_offset_0, __ts_screen8_color_0)
 __ts_screen8_present(0)
 ```
 
-The generated framebuffer operand, pixel-store operation, and present operation are compiler-private canonical forms and can never be written by the programmer. The suffix records the framebuffer byte count for final capacity checking. The core compiler emits the real assembly directly; this does not expose general source access to raw memory operations.
+The generated framebuffer operand, pixel-store operation, and present operation are compiler-private canonical forms and can never be written by the programmer. The suffix records the framebuffer byte count used to place and clear both buffers. The core compiler emits the real assembly directly; this does not expose general source access to raw memory operations.
 
 The core compiler emits initialization as:
 
@@ -786,21 +786,22 @@ add offsetRegister, offsetRegister, r13
 store_8 [offsetRegister], colorRegister
 ```
 
-Presentation first changes the visible screen pointer, then toggles `r13` and clears the hidden buffer. Finally, the compiler appends two framebuffer regions immediately before `0x8000`:
+Presentation first changes the visible screen pointer, then toggles `r13` and clears the hidden buffer. The compiler appends two dynamically sized framebuffer regions directly after the emitted program and its terminal guard jump:
 
 ```asm
-@0x5a80
+_pre_framebuffer_label:
+jmp _pre_framebuffer_label
 framebuffer_0:
-@0x6d40
+@calculated_framebuffer_1_address
 framebuffer_1:
-@0x8000
+@calculated_framebuffer_end_address
 ```
 
-The shown addresses are for setting `19`, whose 4,800-byte buffers occupy `0x5A80..0x6D3F` and `0x6D40..0x7FFF`. The compiler reports an error if emitted code plus its guard jump overlaps `framebuffer_0`. Capacity uses emitted instruction byte sizes, not source-line counts.
+`framebuffer_0_address` is the byte immediately after the guard instruction. For setting `19`, each buffer occupies 4,800 bytes; changing the setting automatically changes both reserved ranges. Address calculation uses emitted instruction byte sizes, not source-line counts.
 
-Although the hardware resolution setting permits `0..255`, validation continues to reject settings above `25`. The compiler always performs final code-space and two-buffer capacity checks.
+Every hardware resolution setting from `0..255` is accepted. Buffer addresses may exceed 16 bits, so the compiler materializes their high and low halves before configuring or switching buffers.
 
-The compiler does not append a halt or jump. The programmer must prevent execution from falling through into appended data when necessary.
+For Screen8 programs, the compiler appends the shown self-jump so execution cannot fall through into framebuffer memory. Programs without Screen8 receive no implicit terminal instruction.
 
 ## 15. Mapping to Symphony assembly
 
@@ -825,9 +826,9 @@ Precompilers are responsible for source conveniences that can be represented in 
 
 Source labels, `goto`, inline assembly, raw Symphony instructions, and other low-level escape hatches are prohibited.
 
-When Screen8 is present, the compiler reserves `r13`, places two buffers immediately before `0x8000`, and validates that generated code does not overlap them. Compiler-generated memory stores are permitted for these framebuffers even though direct source use remains prohibited.
+When Screen8 is present, the compiler reserves `r13` and places two resolution-sized buffers directly after the generated terminal guard. Compiler-generated memory stores are permitted for these framebuffers even though direct source use remains prohibited.
 
-The compiler appends no halt instruction or terminal loop. Ending execution safely is the programmer's responsibility. A program that must stop progressing can explicitly end in a suitable loop.
+The compiler normally appends no halt instruction or terminal loop. Screen8 is the exception: its generated framebuffer storage is preceded by the self-jumping guard shown above.
 
 ### Open lowering details
 
