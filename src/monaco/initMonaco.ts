@@ -10,6 +10,7 @@ const DEFAULT_FONT_SIZE = 13
 
 export interface MonacoEditorController {
   editorHost: Ref<HTMLElement | null>
+  replaceText: (value: string) => void
   zoom: (newValue: number) => void
 }
 
@@ -516,6 +517,23 @@ export function initMonaco(source: Ref<string>): MonacoEditorController {
     })
   }
 
+  const replaceText = (value: string): void => {
+    if (!editor || !model) {
+      source.value = value
+      return
+    }
+    if (model.getValue() === value) return
+
+    const selection = editor.getSelection()
+    editor.pushUndoStop()
+    editor.executeEdits(
+      'format-source',
+      [{ range: model.getFullModelRange(), text: value, forceMoveMarkers: true }],
+      selection ? [selection] : undefined,
+    )
+    editor.pushUndoStop()
+  }
+
   onMounted(() => {
     if (!editorHost.value) return
 
@@ -566,5 +584,5 @@ export function initMonaco(source: Ref<string>): MonacoEditorController {
     model?.dispose()
   })
 
-  return { editorHost, zoom }
+  return { editorHost, replaceText, zoom }
 }

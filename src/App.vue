@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { computed, ref, toRef, watch } from 'vue'
+import { formatSourceIndentation } from './monaco/formatSourceIndentation'
 import { initMonaco } from './monaco/initMonaco'
 import { useAppState } from './stores/appState'
 import { useUiState } from './stores/uiState'
 
 const store = useAppState()
 const uiStore = useUiState()
-const { editorHost, zoom: zoomEditor } = initMonaco(toRef(store, 'text'))
+const { editorHost, replaceText, zoom: zoomEditor } = initMonaco(toRef(store, 'text'))
 const fileInput = ref<HTMLInputElement | null>(null)
 const editorStatus = ref(store.text ? 'Restored' : 'Idle')
 const resultStatus = ref(store.compiled ? 'Compiled' : 'Waiting')
@@ -81,6 +82,11 @@ const compile = () => {
   store.compile()
   resultStatus.value = 'Compiled'
 }
+
+const formatSource = () => {
+  replaceText(formatSourceIndentation(store.text))
+  editorStatus.value = 'Formatted'
+}
 </script>
 
 <template>
@@ -90,6 +96,7 @@ const compile = () => {
         <button type="button" @click="openFilePicker">Open TXT</button>
         <button type="button" @click="downloadText(store.text, 'source.txt')">Download</button>
         <button type="button" @click="copyText(store.text, 'editor')">Copy</button>
+        <button type="button" @click="formatSource">Format</button>
       </div>
 
       <div class="spacer" />
