@@ -9,6 +9,9 @@ export interface Screen8PixelWrite {
 export const parseScreen8Declaration = (code: string): string | undefined =>
   code.match(/^\s*let\s+screen\s*=\s*Screen8\s*\((.*)\)\s*$/)?.[1]?.trim()
 
+export const parseScreen8Present = (code: string): string | undefined =>
+  code.match(/^\s*screen\s*\.\s*present\s*\((.*)\)\s*$/)?.[1]?.trim()
+
 export const parseScreen8PixelWrite = (code: string): Screen8PixelWrite | undefined => {
   const trimmed = code.trim()
   if (!/^screen\s*\[/.test(trimmed)) return undefined

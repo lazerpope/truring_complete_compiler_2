@@ -57,6 +57,9 @@ const COMPARISON_JUMPS: Partial<Record<BinaryOperator, string>> = {
 
 const isComparison = (operator: BinaryOperator): boolean => operator in COMPARISON_JUMPS
 
+const FRAMEBUFFER_END = 0x8000
+const SCREEN8_DRAW_REGISTER = 'r13'
+
 export function doStep(pipeline: PrecompilerPipeline): PrecompilerPipeline {
   return runCompilerTransform(pipeline, (source) => {
     const program = parseCanonical(source)
@@ -86,13 +89,31 @@ class AssemblyCompiler {
         const trimmed = line.trim()
         return trimmed !== '' && !trimmed.startsWith('#') && !trimmed.endsWith(':')
       }).length * 4
-      if (programByteCount + this.framebufferByteCount > 0x6000) {
+      const framebuffer0Address = FRAMEBUFFER_END - this.framebufferByteCount * 2
+      const framebuffer1Address = FRAMEBUFFER_END - this.framebufferByteCount
+      if (framebuffer0Address < 0) {
         throw this.error(
           this.framebufferLocation!,
-          `Program (${programByteCount} bytes) and Screen8 framebuffer (${this.framebufferByteCount} bytes) exceed 0x6000`,
+          `Two Screen8 framebuffers (${this.framebufferByteCount} bytes each) exceed 0x8000`,
         )
       }
-      this.lines.push('', '_pre_framebuffer_label:', 'jmp _pre_framebuffer_label', 'framebuffer:', '@0x6000')
+      const guardByteCount = 4
+      if (programByteCount + guardByteCount > framebuffer0Address) {
+        throw this.error(
+          this.framebufferLocation!,
+          `Program (${programByteCount} bytes), guard, and two Screen8 framebuffers (${this.framebufferByteCount} bytes each) exceed 0x8000`,
+        )
+      }
+      this.lines.push(
+        '',
+        '_pre_framebuffer_label:',
+        'jmp _pre_framebuffer_label',
+        `@0x${framebuffer0Address.toString(16)}`,
+        'framebuffer_0:',
+        `@0x${framebuffer1Address.toString(16)}`,
+        'framebuffer_1:',
+        '@0x8000',
+      )
     }
     return this.lines.join('\n')
   }
@@ -155,6 +176,9 @@ class AssemblyCompiler {
         return
       case 'screen8Store':
         this.compileScreen8Store(statement.offset, statement.value, statement.location)
+        return
+      case 'screen8Present':
+        this.compileScreen8Present(statement.color, statement.location)
         return
       case 'if':
         this.compileIf(statement)
@@ -233,11 +257,13 @@ class AssemblyCompiler {
       }
       this.framebufferByteCount = valueExpression.byteCount
       this.framebufferLocation = valueExpression.location
+      this.registers.reserve(SCREEN8_DRAW_REGISTER, valueExpression.location)
       const value = this.registers.acquire(valueExpression.location)
-      this.emit(`add ${value}, zr, framebuffer`)
+      this.emit(`add ${value}, zr, framebuffer_0`)
       this.emit(`screen ${setting}, ${value}`)
       this.registers.release(value)
       this.registers.release(setting)
+      this.emit(`add ${SCREEN8_DRAW_REGISTER}, zr, framebuffer_1`)
       return
     }
     if (valueExpression.type === 'literal' && valueExpression.value <= 0xffff) {
@@ -261,10 +287,54 @@ class AssemblyCompiler {
     }
     const offset = this.compileExpression(offsetExpression)
     const value = this.compileExpression(valueExpression)
-    this.emit(`add ${offset}, ${offset}, framebuffer`)
+    this.emit(`add ${offset}, ${offset}, ${SCREEN8_DRAW_REGISTER}`)
     this.emit(`store_8 [${offset}], ${value}`)
     this.registers.release(value)
     this.registers.release(offset)
+  }
+
+  private compileScreen8Present(colorExpression: Expression, location: SourceLocation): void {
+    if (this.framebufferByteCount === undefined) {
+      throw this.error(location, 'Generated Screen8 present appeared before initialization')
+    }
+    if (this.framebufferByteCount % 4 !== 0) {
+      throw this.error(location, 'Screen8 framebuffer size must be divisible by four')
+    }
+
+    const color = this.compileExpression(colorExpression)
+    const setting = this.registers.acquire(location)
+    this.emit(`mov ${setting}, 1`)
+    this.emit(`screen ${setting}, ${SCREEN8_DRAW_REGISTER}`)
+    this.registers.release(setting)
+
+    const framebuffer0Address = FRAMEBUFFER_END - this.framebufferByteCount * 2
+    const framebuffer1Address = FRAMEBUFFER_END - this.framebufferByteCount
+    const bufferToggleMask = framebuffer0Address ^ framebuffer1Address
+    this.emit(`xor ${SCREEN8_DRAW_REGISTER}, ${SCREEN8_DRAW_REGISTER}, ${bufferToggleMask}`)
+    this.emit(`and ${color}, ${color}, 255`)
+
+    const shifted = this.registers.acquire(location)
+    this.emit(`mov ${shifted}, ${color}`)
+    this.emit(`lsl ${shifted}, ${shifted}, 8`)
+    this.emit(`or ${color}, ${color}, ${shifted}`)
+    this.emit(`mov ${shifted}, ${color}`)
+    this.emit(`lsl ${shifted}, ${shifted}, 16`)
+    this.emit(`or ${color}, ${color}, ${shifted}`)
+    this.registers.release(shifted)
+
+    const address = this.registers.acquire(location)
+    const endAddress = this.registers.acquire(location)
+    this.emit(`mov ${address}, ${SCREEN8_DRAW_REGISTER}`)
+    this.emit(`add ${endAddress}, ${SCREEN8_DRAW_REGISTER}, ${this.framebufferByteCount}`)
+    const clearLabel = this.label('screen8_clear')
+    this.emitLabel(clearLabel)
+    this.emit(`store_32 [${address}], ${color}`)
+    this.emit(`add ${address}, ${address}, 4`)
+    this.emit(`cmp ${address}, ${endAddress}`)
+    this.emit(`jb ${clearLabel}`)
+    this.registers.release(endAddress)
+    this.registers.release(address)
+    this.registers.release(color)
   }
 
   private compileIf(statement: Extract<Statement, { type: 'if' }>): void {
@@ -581,6 +651,16 @@ class RegisterPool {
     }
     this.allocated.add(register)
     return register
+  }
+
+  reserve(register: string, location: SourceLocation): void {
+    if (this.allocated.has(register)) {
+      throw new CompilerError(
+        `Line ${location.line}, column ${location.column}: Cannot reserve active register ${register}`,
+      )
+    }
+    const index = this.available.indexOf(register)
+    if (index >= 0) this.available.splice(index, 1)
   }
 
   release(register: string): void {

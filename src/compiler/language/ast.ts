@@ -12,6 +12,7 @@ export type Statement =
   | AssignmentStatement
   | HardwareWriteStatement
   | Screen8StoreStatement
+  | Screen8PresentStatement
   | IfStatement
   | WhileStatement
   | BreakStatement
@@ -45,6 +46,11 @@ export interface Screen8StoreStatement extends StatementBase {
   type: 'screen8Store'
   offset: Expression
   value: Expression
+}
+
+export interface Screen8PresentStatement extends StatementBase {
+  type: 'screen8Present'
+  color: Expression
 }
 
 export interface IfStatement extends StatementBase {

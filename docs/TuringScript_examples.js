@@ -503,7 +503,7 @@ screen(Math.min(firstSetting, secondSetting), values[index])
 # IMPLEMENTED: Pixel 8 framebuffer macro
 # ============================================================================
 
-let screen = Screen8(19) // 80 x 60, write-only Pixel 8 framebuffer
+let screen = Screen8(19) // 80 x 60, double-buffered Pixel 8 framebuffer
 let GREEN_COLOR = 0b00011100
 screen[10][10] = GREEN_COLOR // x = 10, y = 10, framebuffer byte 810
 
@@ -511,6 +511,7 @@ let pixelX = keyboard()
 let pixelY = input()
 let pixelColor = counter()
 screen[pixelX][pixelY] = pixelColor
+screen.present(GREEN_COLOR) // show the frame, then clear the new hidden buffer to green
 
 # Prohibited Screen8 forms:
 let secondScreen = Screen8(19)

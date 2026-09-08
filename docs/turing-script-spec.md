@@ -712,20 +712,21 @@ A precompiler lowers nested hardware reads into deterministic generated temporar
 
 ### Pixel 8 framebuffer macro
 
-TuringScript supports one precompiler-managed, write-only Pixel 8 framebuffer:
+TuringScript supports one precompiler-managed, double-buffered Pixel 8 screen:
 
 ```js
 let screen = Screen8(19)
 
 let GREEN_COLOR = 0b00011100
 screen[10][10] = GREEN_COLOR
+screen.present(0)
 ```
 
 `let screen = Screen8(resolutionSetting)` is a dedicated declaration-like macro, not an ordinary variable declaration. The words `screen` and `Screen8` remain reserved and cannot be used as ordinary identifiers. `validateIdentifiers` must recognize this one exact form and defer it to the Screen8 validation stage.
 
-The macro owns no ordinary variable or `pstore` pointer slot. Its framebuffer address exists only as the generated assembly label `framebuffer`.
+The macro owns no ordinary variable or `pstore` pointer slot. The compiler reserves `r13` as the hidden drawing-buffer pointer and emits `framebuffer_0` and `framebuffer_1` labels.
 
-The declaration is allowed exactly once, must be at top level, and must appear before every framebuffer write. Only `let screen` is accepted; `const`, `var`, aliases, reassignment, passing, returning, comparison, and standalone use are prohibited. Direct `screen(setting, value)` hardware calls remain separate syntax.
+The declaration is allowed exactly once, must be at top level, and must appear before every framebuffer write or presentation. Only `let screen` is accepted; `const`, `var`, aliases, reassignment, passing, returning, comparison, and standalone use are prohibited. Direct `screen(setting, value)` hardware calls remain separate syntax.
 
 The resolution setting must be a precompiler-resolvable integer from `0` through `255`. Pixel 8 dimensions are:
 
@@ -745,52 +746,59 @@ offset = y * width + x
 
 Therefore `screen[10][10]` at resolution setting `19` addresses byte `810`. Constant coordinates outside the selected dimensions are precompiler errors. Runtime coordinates have no bounds checks. The `x` expression, `y` expression, and color expression are evaluated exactly once, from left to right. A constant color must fit in `0..255`; for a runtime value, `store_8` writes its low eight bits.
 
-The framebuffer is initially write-only. Pixel reads, compound assignments, increment/decrement, `.length`, row values, and using `screen[x]` by itself are prohibited. This avoids requiring generated `load_8` behavior.
+Pixel writes always target the hidden drawing buffer. Pixel reads, compound assignments, increment/decrement, `.length`, row values, and using `screen[x]` by itself are prohibited.
+
+`screen.present(color)` makes the completed drawing buffer visible, changes `r13` to the old displayed buffer, and clears that now-hidden buffer to `color`. Constant colors must fit in `0..255`; runtime colors use their low eight bits. The clear replicates the color into a 32-bit word and uses `store_32`, so setting `19` requires 1,200 clear iterations.
 
 The Screen8 precompiler lowers the source syntax to canonical hardware calls and reserved internal operations conceptually equivalent to:
 
 ```text
 screen(0, 2)
-screen(2, 19)
 screen(1, __ts_screen8_buffer_4800)
+screen(2, 19)
 let __ts_screen8_x_0 = 10
 let __ts_screen8_y_0 = 10
 let __ts_screen8_color_0 = GREEN_COLOR
 let __ts_screen8_offset_0 = __ts_screen8_y_0 * 80 + __ts_screen8_x_0
 __ts_screen8_store(__ts_screen8_offset_0, __ts_screen8_color_0)
+__ts_screen8_present(0)
 ```
 
-The generated `__ts_screen8_buffer_*` operand and `__ts_screen8_store` operation are compiler-private canonical forms and can never be written by the programmer. The suffix records the framebuffer byte count for final capacity checking. The core compiler emits the real assembly directly; this does not expose general source access to `store_8`.
+The generated framebuffer operand, pixel-store operation, and present operation are compiler-private canonical forms and can never be written by the programmer. The suffix records the framebuffer byte count for final capacity checking. The core compiler emits the real assembly directly; this does not expose general source access to raw memory operations.
 
 The core compiler emits initialization as:
 
 ```asm
 mov r1, 0
 screen r1, 2
+mov r1, 1
+add r2, zr, framebuffer_0
+screen r1, r2
+add r13, zr, framebuffer_1
 mov r1, 2
 screen r1, 19
-mov r1, 1
-add r2, zr, framebuffer
-screen r1, r2
 ```
 
 A generated pixel store is compiled conceptually into:
 
 ```asm
-add offsetRegister, offsetRegister, framebuffer
+add offsetRegister, offsetRegister, r13
 store_8 [offsetRegister], colorRegister
 ```
 
-Finally, the compiler appends exactly one framebuffer region:
+Presentation first changes the visible screen pointer, then toggles `r13` and clears the hidden buffer. Finally, the compiler appends two framebuffer regions immediately before `0x8000`:
 
 ```asm
-framebuffer:
-@0x6000
+@0x5a80
+framebuffer_0:
+@0x6d40
+framebuffer_1:
+@0x8000
 ```
 
-`@0x6000` pads memory with zero bytes up to absolute byte address `0x6000`; it is not an instruction. The compiler calculates the final address of `framebuffer` and reports an error unless `framebufferAddress + framebufferByteCount <= 0x6000`. At resolution setting `19`, the framebuffer must begin at or before address `0x0D40` (`8192 - 4800`). Capacity uses emitted instruction byte sizes, not source-line counts.
+The shown addresses are for setting `19`, whose 4,800-byte buffers occupy `0x5A80..0x6D3F` and `0x6D40..0x7FFF`. The compiler reports an error if emitted code plus its guard jump overlaps `framebuffer_0`. Capacity uses emitted instruction byte sizes, not source-line counts.
 
-Although the hardware resolution setting permits `0..255`, the fixed `@0x6000` boundary means settings above `25` can never fit even with an empty program. Smaller settings can still fail when the generated program occupies too much space before `framebuffer`. Validation rejects an impossible setting early, while the compiler always performs the final capacity check.
+Although the hardware resolution setting permits `0..255`, validation continues to reject settings above `25`. The compiler always performs final code-space and two-buffer capacity checks.
 
 The compiler does not append a halt or jump. The programmer must prevent execution from falling through into appended data when necessary.
 
@@ -809,7 +817,7 @@ The core compiler is responsible for:
 - Allocating temporary registers and spilling values when required.
 - Emitting deterministic assembly text.
 - Preserving source comments on the first emitted line associated with a source statement.
-- Compiling generated Screen8 configuration and pixel stores directly into `screen`, address arithmetic, and `store_8` instructions.
+- Compiling generated Screen8 configuration, pixel stores, and presentations directly into screen-pointer updates, address arithmetic, `store_8`, and `store_32` instructions.
 
 Precompilers are responsible for source conveniences that can be represented in the core language, including `const`, `var`, booleans, static structs, array literals and lengths, array validation, large constants, `else if`, `for`, postfix increment/decrement, constant helpers, and registered helper expansions.
 
@@ -817,7 +825,7 @@ Precompilers are responsible for source conveniences that can be represented in 
 
 Source labels, `goto`, inline assembly, raw Symphony instructions, and other low-level escape hatches are prohibited.
 
-When Screen8 is present, the compiler appends the `framebuffer` label and `@0x6000` reservation and validates that the selected framebuffer fits below byte address `0x6000`. Compiler-generated `store_8` is permitted for this framebuffer even though direct source use remains prohibited.
+When Screen8 is present, the compiler reserves `r13`, places two buffers immediately before `0x8000`, and validates that generated code does not overlap them. Compiler-generated memory stores are permitted for these framebuffers even though direct source use remains prohibited.
 
 The compiler appends no halt instruction or terminal loop. Ending execution safely is the programmer's responsibility. A program that must stop progressing can explicitly end in a suitable loop.
 
@@ -859,7 +867,7 @@ The output must use only features understood by the next registered step. The fi
 - Large U32 literals have become operations using U16 pieces.
 - Registered helper functions have been expanded into existing core statements.
 - Nested value-producing hardware calls have been extracted into generated temporaries without changing evaluation or short-circuit order.
-- The Screen8 macro has become three canonical `screen` calls, and two-dimensional pixel assignments have become compiler-private `__ts_screen8_store` operations.
+- The Screen8 macro has become three canonical `screen` calls; pixel assignments and presentations have become compiler-private store and present operations.
 - Simple statements are emitted one per line without semicolons.
 - Comments remain attached to the first generated line for their source statement.
 

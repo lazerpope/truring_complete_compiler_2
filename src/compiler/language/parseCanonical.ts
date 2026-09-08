@@ -1,13 +1,11 @@
 import { CompilerError } from '../compilerError'
 import type {
-  ArrayAccessExpression,
   ArrayCreationExpression,
   AssignmentTarget,
   BinaryExpression,
   BinaryOperator,
   Expression,
   Program,
-  SourceLocation,
   Statement,
 } from './ast'
 import { tokenize, type Token, type TokenKind } from './tokenize'
@@ -101,6 +99,7 @@ class CanonicalParser {
         throw this.error(token, `${token.value} must be removed by a precompiler before canonical compilation`)
       default:
         if (token.value === '__ts_screen8_store') return this.parseScreen8Store()
+        if (token.value === '__ts_screen8_present') return this.parseScreen8Present()
         return this.parseAssignment()
     }
   }
@@ -113,6 +112,14 @@ class CanonicalParser {
     const value = this.parseExpression()
     this.expectValue(')')
     return { type: 'screen8Store', offset, value, location: start.location }
+  }
+
+  private parseScreen8Present(): Statement {
+    const start = this.advance()
+    this.expectValue('(')
+    const color = this.parseExpression()
+    this.expectValue(')')
+    return { type: 'screen8Present', color, location: start.location }
   }
 
   private parseDeclaration(): Statement {

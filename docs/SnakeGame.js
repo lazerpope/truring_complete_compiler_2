@@ -204,4 +204,5 @@ while (true) {
     }
   }
   //DRAW SCORE END
+  screen.present(0)
 }

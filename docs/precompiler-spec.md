@@ -90,8 +90,8 @@ All listed stages are implemented and registration order must match this table.
 |    11 | `validateConstAssignments.ts`    | Implemented | Record `const` bindings and reject later reassignment while leaving declarations intact for constant evaluation.                                                                       |
 |    12 | `lowerMathConstants.ts`          | Implemented | Replace `Math.U16_MAX`, `Math.S16_MAX`, `Math.U32_MAX`, `Math.S32_MIN`, and `Math.S32_MAX` with their U32 values.                                                                      |
 |    13 | `foldConstantExpressions.ts`     | Implemented | Resolve known `const` names, evaluate required constant expressions, and partially fold literal `+`, `-`, `*`, and `/` subexpressions without treating mutable variables as constants. |
-|    14 | `validateScreen8.ts`             | Implemented | Validate the single fixed Screen8 declaration, constant resolution, write-only `[x][y]` access, bounds known at precompile time, and prohibited screen-as-value behavior.              |
-|    15 | `lowerScreen8.ts`                | Implemented | Lower Screen8 initialization into three canonical `screen` calls and pixel writes into deterministic generated temporaries plus compiler-private `__ts_screen8_store` operations.      |
+|    14 | `validateScreen8.ts`             | Implemented | Validate Screen8 declaration, pixel writes, `screen.present(color)`, constant colors, known bounds, and prohibited screen-as-value behavior.                                           |
+|    15 | `lowerScreen8.ts`                | Implemented | Lower Screen8 initialization, pixel writes, and presentation into canonical compiler-private forms.                                                                                  |
 |    16 | `validateArrayRules.ts`          | Implemented | Collect ordinary and struct-generated array metadata and reject zero sizes, runtime sizes, nested arrays, aliasing, reassignment, comparison, passing, and other invalid array use.    |
 |    17 | `lowerArrayLiterals.ts`          | Implemented | Expand ordinary and struct-generated array literals into `Array(size)` plus ordered indexed assignments; holes become zero and a trailing comma is ignored.                            |
 |    18 | `replaceArrayLengths.ts`         | Implemented | Replace each valid ordinary or struct-generated `array.length` with its known constant size.                                                                                           |
@@ -138,12 +138,13 @@ TuringScript source
   -> final Symphony assembly
 ```
 
-For Screen8, `compileCanonical` has four responsibilities:
+For Screen8, `compileCanonical` has five responsibilities:
 
-1. Compile the three generated canonical `screen` calls, resolving the private framebuffer operand to the `framebuffer` label.
-2. Expand each private pixel-store pseudo-operation into framebuffer address addition plus `store_8`.
-3. Calculate the final assembly byte offset and reject a framebuffer that would extend past absolute address `0x6000`.
-4. Append exactly one `framebuffer:` label followed by `@0x6000`.
+1. Compile initialization so `framebuffer_0` is displayed and reserved register `r13` points at hidden `framebuffer_1`.
+2. Expand each private pixel-store pseudo-operation into `r13`-relative address addition plus `store_8`.
+3. Expand each private present pseudo-operation into a screen-offset update, an `r13` buffer toggle, and a hidden-buffer color clear.
+4. Reject generated code that overlaps the two framebuffers ending at absolute address `0x8000`.
+5. Append two equal framebuffer regions immediately before `@0x8000`.
 
 The compiler accepts these private operations only after the trusted precompiler stages. User source cannot spell them because identifiers beginning with `__ts_`, labels, inline assembly, and raw memory operations are rejected before lowering.
 

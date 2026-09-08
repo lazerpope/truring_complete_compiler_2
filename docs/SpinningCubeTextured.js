@@ -325,4 +325,5 @@ while (1) {
 
         edgeIndex++
     }
+    screen.present(0)
 }

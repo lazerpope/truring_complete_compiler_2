@@ -20,6 +20,7 @@ screen(screenSetting, 255)
 let screen = Screen8(19)
 let GREEN_COLOR = 0b00011100
 screen[10][10] = GREEN_COLOR
+screen.present(0)
 
 # Timer: timeLow captures the low word and latches the matching high word.
 # Read timeHigh after timeLow to obtain the corresponding high word.

@@ -2,11 +2,12 @@ import type { PrecompilerPipeline } from '../compilerError'
 import {
   braceDelta,
   sourceLines,
+  splitTopLevel,
   splitTrailingComment,
   tryEvaluateConstant,
   withErrors,
 } from './shared'
-import { parseScreen8Declaration, parseScreen8PixelWrite } from './screen8'
+import { parseScreen8Declaration, parseScreen8PixelWrite, parseScreen8Present } from './screen8'
 
 export function doStep(pipeline: PrecompilerPipeline): PrecompilerPipeline {
   if (pipeline[1].isError) return pipeline
@@ -42,12 +43,31 @@ export function doStep(pipeline: PrecompilerPipeline): PrecompilerPipeline {
           width = 4n * (setting + 1n)
           height = 3n * (setting + 1n)
           if (setting > 25n) {
-            reasons.push(`Line ${line.lineNumber}: Screen8 resolution ${setting} cannot fit before 0x6000`)
+            reasons.push(
+              `Line ${line.lineNumber}: Screen8 resolution ${setting} exceeds the supported double-buffer limit`,
+            )
           }
         }
       }
     } else if (/\bScreen8\b/.test(code)) {
       reasons.push(`Line ${line.lineNumber}: Screen8 is only valid as let screen = Screen8(constant)`)
+    }
+
+    if (/\bscreen\s*\.\s*present\b/.test(code)) {
+      const color = parseScreen8Present(code)
+      if (!color || splitTopLevel(color, ',').length !== 1) {
+        reasons.push(`Line ${line.lineNumber}: screen.present requires exactly one color argument`)
+      } else if (declarationLine === undefined) {
+        reasons.push(`Line ${line.lineNumber}: screen.present cannot be called before Screen8 is declared`)
+      } else {
+        if (/\bscreen\s*\[/.test(color)) {
+          reasons.push(`Line ${line.lineNumber}: Screen8 pixel reads are prohibited`)
+        }
+        const value = tryEvaluateConstant(color, constants)
+        if (value !== undefined && (value < 0n || value > 255n)) {
+          reasons.push(`Line ${line.lineNumber}: screen.present color must fit in 8 bits`)
+        }
+      }
     }
 
     if (/\bscreen\s*\[/.test(code)) {

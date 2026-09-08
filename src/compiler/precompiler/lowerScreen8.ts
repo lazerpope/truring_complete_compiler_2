@@ -1,6 +1,6 @@
 import type { PrecompilerPipeline } from '../compilerError'
 import { nextGeneratedName, splitTrailingComment, tryEvaluateConstant } from './shared'
-import { parseScreen8Declaration, parseScreen8PixelWrite } from './screen8'
+import { parseScreen8Declaration, parseScreen8PixelWrite, parseScreen8Present } from './screen8'
 
 export function doStep(pipeline: PrecompilerPipeline): PrecompilerPipeline {
   if (pipeline[1].isError) return pipeline
@@ -24,9 +24,14 @@ export function doStep(pipeline: PrecompilerPipeline): PrecompilerPipeline {
       const byteCount = width * height
       return [
         `screen(0, 2)${comment ? ` ${comment}` : ''}`,
-        `screen(2, ${setting})`,
         `screen(1, __ts_screen8_buffer_${byteCount})`,
+        `screen(2, ${setting})`,
       ]
+    }
+
+    const presentColor = parseScreen8Present(rawCode)
+    if (presentColor !== undefined) {
+      return [`__ts_screen8_present(${presentColor})${comment ? ` ${comment}` : ''}`]
     }
 
     const write = parseScreen8PixelWrite(rawCode)

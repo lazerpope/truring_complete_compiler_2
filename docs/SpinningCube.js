@@ -146,4 +146,5 @@ edgeIndex++
 }
 drawPass++
 }
+screen.present(0)
 }

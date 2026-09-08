@@ -93,6 +93,7 @@ screen[10][10] = 0b00011100
 let runtimePixelX = keyboard()
 let runtimePixelY = input()
 screen[runtimePixelX][runtimePixelY] = counter()
+screen.present(0)
 
 // validateArrayRules --------------------------------------------------------
 let validArray = Array(10)

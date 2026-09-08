@@ -93,6 +93,7 @@ SourceStatement        ::= SourceSimpleStatement
                          | StaticStructDeclaration
                          | Screen8Declaration
                          | Screen8PixelAssignment
+                         | Screen8Present
                          | IfStatement
                          | WhileStatement
                          | CStyleForStatement
@@ -135,7 +136,7 @@ Semantic rules:
 - Standalone blocks are prohibited.
 - Semicolons are prohibited except for the two separators in a C-style `for` header.
 
-`let screen = Screen8(...)` and `screen[x][y] = value` are dedicated macro productions. In those productions, `screen` is a fixed reserved token rather than an `Identifier`.
+`let screen = Screen8(...)`, `screen[x][y] = value`, and `screen.present(color)` are dedicated macro productions. In those productions, `screen` is a fixed reserved token rather than an `Identifier`.
 
 ## 5. Source control-flow grammar
 
@@ -211,19 +212,22 @@ Further semantic rules:
 Screen8Declaration     ::= "let" "screen" "=" "Screen8" "(" ConstantExpression ")"
 Screen8PixelAssignment ::= "screen" "[" SourceExpression "]"
                           "[" SourceExpression "]" "=" SourceExpression
+Screen8Present         ::= "screen" "." "present" "(" SourceExpression ")"
 ```
 
 Semantic rules:
 
-- Exactly one declaration is allowed, at top level and before all pixel writes.
+- Exactly one declaration is allowed, at top level and before all pixel writes and presentations.
 - The resolution setting resolves at precompile time to `0..255`.
-- With the fixed framebuffer ending at `0x6000`, settings above `25` are always invalid; final capacity depends on compiled program size and is checked by the compiler.
+- Two equal framebuffers are reserved immediately before absolute address `0x8000`; settings above `25` remain invalid.
 - The first index is zero-based `x`; the second is zero-based `y`.
 - Width is `4 * (setting + 1)` and height is `3 * (setting + 1)`.
 - The byte offset is `y * width + x`.
 - Constant out-of-bounds coordinates are errors; runtime coordinates are unchecked.
 - Index and color expressions are evaluated once in `x`, `y`, color order.
 - A constant color is in `0..255`; a runtime color contributes its low eight bits.
+- Pixel assignments always target the hidden drawing buffer through compiler-reserved register `r13`.
+- `screen.present(color)` displays the completed drawing buffer, switches drawing to the old displayed buffer, and clears that hidden buffer to `color`.
 - Screen8 is write-only. Reads, partial indexing, compound assignment, and updates are prohibited.
 - `screen` is not a runtime value and cannot be aliased, reassigned, passed, returned, or compared.
 
@@ -379,6 +383,7 @@ CoreSimpleStatement     ::= CoreScalarDeclaration
                           | CoreHardwareReadAssignment
                           | CoreHardwareWrite
                           | CoreGeneratedScreen8Store
+                          | CoreGeneratedScreen8Present
                           | BreakStatement
                           | ContinueStatement
 
@@ -395,6 +400,7 @@ CoreHardwareWrite       ::= "output" "(" CoreOperand ")"
 CoreOperand             ::= Identifier | U16Literal
 
 CoreGeneratedScreen8Store ::= "__ts_screen8_store" "(" CoreOperand "," CoreOperand ")"
+CoreGeneratedScreen8Present ::= "__ts_screen8_present" "(" CoreExpression ")"
 
 CoreIfStatement         ::= "if" "(" CoreExpression ")" CoreBlock
                            [ { NEWLINE } "else" CoreBlock ]
@@ -433,7 +439,7 @@ Canonical semantic restrictions:
 - `true`, `false`, `null`, and `undefined` have become `0` or `1`.
 - Array literals have become `Array(size)` plus indexed assignments.
 - Static structs, struct construction, struct fields, `.length`, `Math`, constant `**`, `else if`, both forms of `for`, postfix updates, and compound assignments are absent.
-- Source-level `Screen8` declarations and two-dimensional `screen[x][y]` assignments are absent. Initialization is three canonical `screen` calls; only the compiler-generated `__ts_screen8_buffer_<bytes>` operand and `__ts_screen8_store` operation may remain.
+- Source-level `Screen8` declarations, pixel assignments, and presentations are absent. Initialization is three canonical `screen` calls; only the compiler-generated framebuffer operand, pixel-store operation, and present operation may remain.
 - Strict equality spellings have been collapsed: `===` is `==`, and `!==` is `!=`.
 - Nested hardware reads and complex hardware-write arguments have become ordered temporary statements.
 - User-authored identifiers never begin with `__ts_`; generated identifiers do.
@@ -446,16 +452,20 @@ Canonical source may contain these private generated forms; they are never accep
 ```text
 screen(1, __ts_screen8_buffer_ByteCount)
 __ts_screen8_store(OffsetOperand, ColorOperand)
+__ts_screen8_present(ColorExpression)
 ```
 
-The compiler emits real `screen`, address arithmetic, and `store_8` instructions, then appends:
+The compiler emits real `screen`, address arithmetic, `store_8`, and hidden-buffer `store_32` clear instructions, then appends two buffers:
 
 ```asm
-framebuffer:
-@0x6000
+@framebuffer_0_address
+framebuffer_0:
+@framebuffer_1_address
+framebuffer_1:
+@0x8000
 ```
 
-The final framebuffer must fit entirely below absolute byte address `0x6000`.
+Generated code plus the guard jump must end before `framebuffer_0`, and both buffers end at `0x8000`.
 
 ## 12. Program completion
 

@@ -322,7 +322,7 @@ export function initMonaco(source: Ref<string>): MonacoEditorController {
       {
         label: 'Screen8',
         kind: monaco.languages.CompletionItemKind.Constructor,
-        detail: 'Configure the single write-only 8-bit framebuffer screen',
+        detail: 'Configure the double-buffered 8-bit framebuffer screen',
         insertText: 'let screen = Screen8(${1:19})',
         insertTextRules: snippetRule,
       },
@@ -332,6 +332,14 @@ export function initMonaco(source: Ref<string>): MonacoEditorController {
         kind: monaco.languages.CompletionItemKind.Snippet,
         detail: 'Write one 8-bit framebuffer pixel',
         insertText: 'screen[${1:x}][${2:y}] = ${3:color}',
+        insertTextRules: snippetRule,
+      },
+      {
+        label: 'screen.present',
+        filterText: 'screen present',
+        kind: monaco.languages.CompletionItemKind.Method,
+        detail: 'Present the completed frame and clear the hidden buffer',
+        insertText: 'screen.present(${1:color})',
         insertTextRules: snippetRule,
       },
     ]
@@ -400,6 +408,16 @@ export function initMonaco(source: Ref<string>): MonacoEditorController {
             label: String(item.label).replace('Math.', ''),
             insertText: item.insertText.replace('Math.', ''),
           }))
+        } else if (/\bscreen\.[A-Za-z_]*$/.test(linePrefix)) {
+          templates = [
+            {
+              label: 'present',
+              kind: monaco.languages.CompletionItemKind.Method,
+              detail: 'Present the frame and clear the hidden buffer',
+              insertText: 'present(${1:color})',
+              insertTextRules: snippetRule,
+            },
+          ]
         } else if (/\b[A-Za-z_$][\w$]*\.[A-Za-z_]*$/.test(linePrefix)) {
           const documentText = currentModel.getValue()
           const accessedName = linePrefix.match(/([A-Za-z_$][\w$]*)\.[A-Za-z_]*$/)?.[1]
